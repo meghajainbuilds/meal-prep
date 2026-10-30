@@ -1,0 +1,17 @@
+{
+  "project_name": "meal-prep",
+  "coding_agent": "claude-code",
+  "blocks": ["foundation", "publish", "models", "always-on"],
+  "publish": {
+    "host": "netlify",
+    "sign_in": "google"
+  },
+  "always_on": {
+    "where": "mac"
+  },
+  "models": {
+    "agent_command": "claude",
+    "app_provider": "anthropic",
+    "app_model": "claude-sonnet-5-5"
+  }
+}
