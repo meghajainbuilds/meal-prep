@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.megha.mealprep.generate-week</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/meghajain/Projects/Meal-prep/scripts/run-job.sh</string>
+    <string>generate-week</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>5</integer>
+    <key>Hour</key><integer>10</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/Users/meghajain/Projects/Meal-prep/jobs/logs/launchd.generate-week.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/meghajain/Projects/Meal-prep/jobs/logs/launchd.generate-week.err</string>
+</dict>
+</plist>

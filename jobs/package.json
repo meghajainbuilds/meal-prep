@@ -1,0 +1,14 @@
+{
+  "name": "meal-prep-jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "node run.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "@supabase/supabase-js": "^2.50.0",
+    "dotenv": "^17.0.0"
+  }
+}
