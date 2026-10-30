@@ -5,7 +5,7 @@
 **Agent:** claude   **Updated:** 2026-10-30
 
 ## Blocks
-- [ ] foundation: <GitHub URL>, <Supabase project URL>
+- [x] foundation: https://github.com/meghajainbuilds/meal-prep , https://moajmtdzkcxabmkqflzf.supabase.co
 - [ ] publish: netlify, <live URL>
 - [ ] models: agent claude, app anthropic claude-sonnet-5-5
 - [ ] always-on: mac
@@ -16,7 +16,9 @@
 
 ## Settings (names only)
 - SUPABASE_URL
+- SUPABASE_PROJECT_REF
 - SUPABASE_PUBLISHABLE_KEY
+- SUPABASE_ACCESS_TOKEN (personal access token; used for CLI/API automation)
 - SUPABASE_SERVICE_ROLE_KEY (server-side only)
 - ANTHROPIC_API_KEY
 - GOOGLE_OAUTH_CLIENT_ID (via Supabase Auth)
@@ -24,6 +26,8 @@
 
 ## Proven
 - 2026-10-30: harness.config.json and MAP.md created, blocks chosen and confirmed by owner.
+- 2026-10-30: Private GitHub repo meghajainbuilds/meal-prep created and initial commit pushed.
+- 2026-10-30: Supabase project moajmtdzkcxabmkqflzf provisioned; schema v1 applied via Management API; 9 tables with RLS, 36 policies (public-read planned content, owner-only private tables).
 
 ## Open
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site (ChatGPT-hosted). Match UI/features; depart only for stack choices (Supabase + Netlify).
