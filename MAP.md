@@ -6,9 +6,13 @@
 
 ## Blocks
 - [x] foundation: https://github.com/meghajainbuilds/meal-prep , https://moajmtdzkcxabmkqflzf.supabase.co
-- [ ] publish: netlify, <live URL>
-- [ ] models: agent claude, app anthropic claude-sonnet-5-5
+- [x] publish: netlify, https://meal-prep-megha.netlify.app (site id 4cf9246b-652b-4786-8ef2-6df189d5c079)
+- [x] models: agent claude, app anthropic claude-sonnet-5-5 via Netlify Function at /api/ai
 - [ ] always-on: mac
+
+## Auth
+- Supabase email magic link (not Google). Owner: meghajain@outlook.com. Can swap to Google later.
+- Supabase Site URL + Redirect allowlist include https://meal-prep-megha.netlify.app and http://localhost:5173.
 - [-] messaging: not in scope (web app only)
 
 ## Controls
@@ -19,15 +23,17 @@
 - SUPABASE_PROJECT_REF
 - SUPABASE_PUBLISHABLE_KEY
 - SUPABASE_ACCESS_TOKEN (personal access token; used for CLI/API automation)
-- SUPABASE_SERVICE_ROLE_KEY (server-side only)
+- SUPABASE_SERVICE_ROLE_KEY (server-side only, for scheduled jobs)
+- NETLIFY_AUTH_TOKEN (personal access token; used for deploys)
 - ANTHROPIC_API_KEY
-- GOOGLE_OAUTH_CLIENT_ID (via Supabase Auth)
-- GOOGLE_OAUTH_CLIENT_SECRET (via Supabase Auth)
+- (app build-time) VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
 
 ## Proven
 - 2026-10-30: harness.config.json and MAP.md created, blocks chosen and confirmed by owner.
 - 2026-10-30: Private GitHub repo meghajainbuilds/meal-prep created and initial commit pushed.
 - 2026-10-30: Supabase project moajmtdzkcxabmkqflzf provisioned; schema v1 applied via Management API; 9 tables with RLS, 36 policies (public-read planned content, owner-only private tables).
+- 2026-10-30: Netlify site meal-prep-megha created, dist/ deployed via API, team SSO + site visitor-access set to public. Supabase auth site_url + allowlist updated. Owner signed in via magic link and inserted a placeholder weeks row; public-read verified via REST; private tables correctly return [] unauth.
+- 2026-10-30: Netlify Function /api/ai deployed; ANTHROPIC_API_KEY + AI_MODEL set as function env; smoke test "Say ok" returned "ok" via claude-sonnet-5-5. `claude -p "Say ok"` also OK.
 
 ## Open
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site (ChatGPT-hosted). Match UI/features; depart only for stack choices (Supabase + Netlify).
