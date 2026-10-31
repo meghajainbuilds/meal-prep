@@ -13,6 +13,17 @@
   - generate-week: Fri 10:00 Seattle (next-Monday draft)
   - monday-upkeep: Mon 8:00 Seattle (stub; fills in with planner UI)
 
+## Planner UI (built on top of the harness)
+- [x] Design system: Fraunces (display) + Inter (body); cream `#f3efe4`, forest green `#1f3f2d`, terracotta `#a84a26`, sage `#e4e8d4`. Tokens in `app/src/index.css` under `@theme`.
+- [x] Shell: `app/src/App.tsx` + `components/Header`, `Intro`, `Nav`, `Logo`. Router in `main.tsx`.
+- [x] Week view (`views/Week.tsx`): Mon-Sun rows, Breakfast/Lunch/Dinner columns, dish chips.
+- [x] Recipes view (`views/Recipes.tsx`): card grid reading from recipes table.
+- [ ] Day view: 7-day pill selector exists; timeline (per-meal cards with My plate + ate-it) not yet built.
+- [ ] Ingredients view: placeholder shell only.
+- [ ] Prep view: placeholder shell only.
+- [ ] Dish photography: all placeholders (sage squares w/ initials). Decision open — generate via model vs. owner uploads.
+- Seed: `cd jobs && node run.mjs seed-week-1` populates 21 recipes + 63 meal items for Oct 26 - Nov 1 (idempotent on recipes; wipes & rewrites meal plan for that week).
+
 ## Auth
 - Supabase email magic link (not Google). Owner: meghajain@outlook.com. Can swap to Google later.
 - Supabase Site URL + Redirect allowlist include https://meal-prep-megha.netlify.app and http://localhost:5173.
@@ -44,11 +55,33 @@
 - 2026-10-30: Netlify site meal-prep-megha created, dist/ deployed via API, team SSO + site visitor-access set to public. Supabase auth site_url + allowlist updated. Owner signed in via magic link and inserted a placeholder weeks row; public-read verified via REST; private tables correctly return [] unauth.
 - 2026-10-30: Netlify Function /api/ai deployed; ANTHROPIC_API_KEY + AI_MODEL set as function env; smoke test "Say ok" returned "ok" via claude-sonnet-5-5. `claude -p "Say ok"` also OK.
 - 2026-10-30: jobs/ scaffold with env + db (service-role) + claude helpers. heartbeat ran end-to-end (DB + Claude). generate-week inserted week 2026-11-02 v1 as a dry-run. monday-upkeep stub returns. All 3 launchd plists installed via scripts/install-launchd.sh and visible in launchctl list.
+- 2026-10-30: Planner UI v1 shipped — design system, shell, Week view, Recipes grid, placeholder tabs for Day/Ingredients/Prep. 21 recipes + 63 meal plan items seeded for 2026-10-26 week. Live at https://meal-prep-megha.netlify.app.
 
-## Open
-- Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site (ChatGPT-hosted). Match UI/features; depart only for stack choices (Supabase + Netlify).
-- Owner identity: meghajain@outlook.com. Auth: Supabase email magic link (not Google). Can swap to Google later.
-- Next: planner UI build-out in order Week -> Day -> Ingredients -> Prep sessions -> Recipes -> Actual-eating logs. One week first (Mon Oct 26 - Sun Nov 1, 2026).
-- generate-week and monday-upkeep are infrastructure stubs. They fill in with real logic (AI-driven weekly plan, prefill checks, snapshot/export) during planner UI build-out.
-- "House manager" framing is dropped per owner. Prep sessions are for the single owner.
-- Full requirements doc: pasted by owner on 2026-10-30; captured in memory `meal-prep-project`.
+## Admin URLs
+- Live app: https://meal-prep-megha.netlify.app
+- GitHub repo: https://github.com/meghajainbuilds/meal-prep
+- Supabase dashboard: https://supabase.com/dashboard/project/moajmtdzkcxabmkqflzf
+- Netlify site admin: https://app.netlify.com/projects/meal-prep-megha
+- Anthropic console: https://console.anthropic.com/
+- Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site
+
+## Next-session queue (in order)
+1. Day view timeline — timeline on left (time labels), meal cards with MY PLATE box, dish images, ate-it checkboxes, "Ate the whole meal" + "Ate something else" + "Check what you ate" per meal. Then "+ Add planned meal", "Apply a sample menu", "Planned estimate" box.
+2. Ingredients view — collapsible categories (Fresh / Pantry / Alternatives), Have/Buy checkboxes, quantity edit, used-in links. Needs shopping_items seeded too.
+3. Prep view — two toggleable sessions, numbered Chop/Roast/Cook groups, item rows with checkbox + image + name + quantity + Move-to-2/Edit/Remove.
+4. Recipes view polish — category chip filters, favorites heart, search, "Recipe & source" link.
+5. Dish photography decision — generate via Nano Banana / Claude image gen vs owner uploads.
+6. Actual-eating logs — private storage, Day-view ate-it checkbox wiring.
+7. Real logic for generate-week + monday-upkeep (currently stubs).
+
+## Known gotchas (don't re-discover)
+- Netlify: Team Access Controls / Visitor access can block public reads. Must be "Public" at both team and site level.
+- Supabase: Management API with PAT can run arbitrary SQL via POST /v1/projects/{ref}/database/query. Use for all schema changes; don't send Megha to the SQL Editor UI.
+- Supabase: secret key must be fetched from dashboard (`sb_secret_...`); Management API returns it masked.
+- Node is nvm-managed. launchd plists use `scripts/run-job.sh` which sources nvm, don't hard-code node path.
+- All deploys are direct uploads via Netlify CLI with NETLIFY_AUTH_TOKEN env var. GitHub-triggered auto-deploys are NOT wired up.
+
+## Open decisions
+- Owner-provided vs. AI-generated dish photos.
+- Keep "The Week's Table" name or rename.
+- Nav tab visual (terracotta top rule + green underline) matches prototype — pending owner review.
