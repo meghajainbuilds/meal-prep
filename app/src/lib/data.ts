@@ -143,13 +143,20 @@ export function weekDates(weekStart: string): string[] {
 }
 
 export async function getLatestWeek(): Promise<Week | null> {
-  const { data } = await supabase
+  const { data: weeks } = await supabase
     .from('weeks')
     .select('id, week_start, version, notes')
     .order('week_start', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return data as Week | null
+    .order('version', { ascending: false })
+  if (!weeks || weeks.length === 0) return null
+  for (const w of weeks as Week[]) {
+    const { count } = await supabase
+      .from('meal_plan_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('week_id', w.id)
+    if ((count ?? 0) > 0) return w
+  }
+  return (weeks[0] as Week) ?? null
 }
 
 export async function getWeekByStart(weekStart: string): Promise<Week | null> {
@@ -311,6 +318,39 @@ export async function upsertSlotAteLog(args: {
     .single()
   if (error) throw error
   return inserted!.id as string
+}
+
+export type ShoppingItem = {
+  id: string
+  week_id: string
+  name: string
+  category: string | null
+  quantity: string | null
+  unit: string | null
+  have: boolean
+  image_url: string | null
+  used_in_recipes: { id: string; name: string; image_url: string | null }[]
+  is_pantry: boolean
+}
+
+export const INGREDIENT_CATEGORIES: { key: string; label: string }[] = [
+  { key: 'fresh', label: 'Fresh, chilled & frozen' },
+  { key: 'pantry', label: 'Pantry' },
+  { key: 'alternatives', label: 'Alternatives' },
+]
+
+export async function getShoppingItemsForWeek(weekId: string): Promise<ShoppingItem[]> {
+  const { data } = await supabase
+    .from('shopping_items')
+    .select('id, week_id, name, category, quantity, unit, have, image_url, used_in_recipes, is_pantry')
+    .eq('week_id', weekId)
+    .order('name', { ascending: true })
+  return (data ?? []) as ShoppingItem[]
+}
+
+export async function updateShoppingItem(id: string, patch: Partial<Pick<ShoppingItem, 'have' | 'quantity'>>) {
+  const { error } = await supabase.from('shopping_items').update(patch).eq('id', id)
+  if (error) throw error
 }
 
 export async function clearSlotAteLog(dayDate: string, slot: MealPlanItem['slot']) {

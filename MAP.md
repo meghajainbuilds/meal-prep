@@ -19,10 +19,10 @@
 - [x] Week view (`views/Week.tsx`): Mon-Sun rows, Breakfast/Lunch/Dinner columns, dish chips.
 - [x] Recipes view (`views/Recipes.tsx`): card grid reading from recipes table.
 - [x] Day view (`views/Day.tsx`): 7-day pill selector, 5-slot timeline with time rail + dots, per-slot `MealCard` (dishes + MY PLATE sage box + ate-it toggle + "+ Add dish"), day toolbar ("+ Add planned meal", "Apply a sample menu"), `PlannedEstimate` sidebar (counts + tag composition + per-slot summary; no fake calories). AddDishModal (recipe search + custom), SampleMenuPicker (3 templates, wipes + rewrites one day).
-- [ ] Ingredients view: placeholder shell only.
+- [x] Ingredients view (`views/Ingredients.tsx`): 3 collapsible categories (Fresh / Pantry / Alternatives) with "All ingredients" vs "Check / buy only" filter, "N marked Have · M to check" counter (excludes Alternatives), Expand/Collapse all, Print list, per-row image + name + editable quantity + Have checkbox + USED IN chips. Writes to `shopping_items`.
 - [ ] Prep view: placeholder shell only.
-- [ ] Dish photography: all placeholders (sage squares w/ initials). Decision open — generate via model vs. owner uploads.
-- Seed: `cd jobs && node run.mjs seed-week-1` populates 21 recipes + 63 meal items for Oct 26 - Nov 1 (idempotent on recipes; wipes & rewrites meal plan for that week).
+- [ ] Dish & ingredient photography: all placeholders. **Decision: always generate (owner will never upload).** Not yet wired to any image gen pipeline — image_url is null on recipes and shopping_items.
+- Seed: `cd jobs && node run.mjs seed-week-1` → recipes + meal plan. `node run.mjs seed-shopping-1` → 56 shopping_items (30 fresh + 18 pantry + 8 alternatives, 19 marked Have) for Oct 26 week.
 
 ## Auth
 - Supabase email magic link (not Google). Owner: meghajain@outlook.com. Can swap to Google later.
@@ -57,6 +57,8 @@
 - 2026-10-30: jobs/ scaffold with env + db (service-role) + claude helpers. heartbeat ran end-to-end (DB + Claude). generate-week inserted week 2026-11-02 v1 as a dry-run. monday-upkeep stub returns. All 3 launchd plists installed via scripts/install-launchd.sh and visible in launchctl list.
 - 2026-10-30: Planner UI v1 shipped — design system, shell, Week view, Recipes grid, placeholder tabs for Day/Ingredients/Prep. 21 recipes + 63 meal plan items seeded for 2026-10-26 week. Live at https://meal-prep-megha.netlify.app.
 - 2026-10-30: Day view v1 shipped — 5-slot timeline, MealCard with MY PLATE + ate-it, AddDishModal, SampleMenuPicker (3 templates), PlannedEstimate sidebar. Writes to meal_plan_items (plan) and actual_eating_log (private ate-it, keyed by sentinel `__slot__`). Deployed via Netlify CLI.
+- 2026-10-30: getLatestWeek() fixed to skip empty weeks (previously returned the Friday-stub 2026-11-02 week with 0 items, making Week view blank).
+- 2026-10-30: Ingredients view v1 shipped — 3 collapsible categories, filter toggle, Have/quantity edit, USED IN chips. 56 shopping_items seeded for Oct 26 week via `seed-shopping-1`.
 
 ## Admin URLs
 - Live app: https://meal-prep-megha.netlify.app
@@ -67,11 +69,11 @@
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site
 
 ## Next-session queue (in order)
-1. Ingredients view — collapsible categories (Fresh / Pantry / Alternatives), Have/Buy checkboxes, quantity edit, used-in links. Needs shopping_items seeded too.
-2. Prep view — two toggleable sessions, numbered Chop/Roast/Cook groups, item rows with checkbox + image + name + quantity + Move-to-2/Edit/Remove.
+1. Prep view — two toggleable sessions, numbered Chop/Roast/Cook groups, item rows with checkbox + image + name + quantity + Move-to-2/Edit/Remove.
+2. Image generation pipeline — generate photos for every recipe + shopping_item and store `image_url` (Anthropic image path or similar). Owner never uploads. Could be a background job that fills nulls.
 3. Recipes view polish — category chip filters, favorites heart, search, "Recipe & source" link.
-4. Dish photography decision — generate via Nano Banana / Claude image gen vs owner uploads.
-5. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE to a dedicated `day_slot_notes` table or `slot_note` column (currently piggybacks on first dish's `custom_notes` — survives but drifts if that dish is removed).
+4. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam.
+5. Ingredients polish — "+ Add ingredient" button; drag-sort within a category; print-only stylesheet (currently uses browser default).
 6. Real logic for generate-week + monday-upkeep (currently stubs).
 
 ## Known gotchas (don't re-discover)
