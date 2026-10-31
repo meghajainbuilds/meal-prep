@@ -9,6 +9,7 @@ export type Recipe = {
   cuisine: string | null
   is_favorite: boolean
   source_link: string | null
+  is_plate_component: boolean
 }
 
 export type RecipeFull = Recipe & {
@@ -23,7 +24,7 @@ export type RecipeFull = Recipe & {
 export async function getRecipeById(id: string): Promise<RecipeFull | null> {
   const { data } = await supabase
     .from('recipes')
-    .select('id, name, description, image_url, tags, cuisine, is_favorite, source_link, source_chef, ingredients, method, favorite_reason, adaptations, sesame_safe')
+    .select('id, name, description, image_url, tags, cuisine, is_favorite, source_link, source_chef, ingredients, method, favorite_reason, adaptations, sesame_safe, is_plate_component')
     .eq('id', id)
     .maybeSingle()
   if (!data) return null
@@ -255,7 +256,7 @@ export function groupBySlot(items: MealPlanItem[]): Map<MealPlanItem['slot'], Me
 export async function getAllRecipes(): Promise<Recipe[]> {
   const { data } = await supabase
     .from('recipes')
-    .select('id, name, description, image_url, tags, cuisine, is_favorite, source_link')
+    .select('id, name, description, image_url, tags, cuisine, is_favorite, source_link, is_plate_component')
     .order('name', { ascending: true })
   return (data ?? []) as Recipe[]
 }
