@@ -4,6 +4,7 @@ import type { AppContext } from '../App'
 import DishChip from '../components/DishChip'
 import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
+import WeekPicker from '../components/WeekPicker'
 import {
   dayLong, dayShort, dayNumber,
   getMealPlanForWeek, groupByDay, groupBySlot,
@@ -18,7 +19,7 @@ const COLS: { slot: MealPlanItem['slot']; label: string }[] = [
 ]
 
 export default function Week() {
-  const { session, activeWeek } = useOutletContext<AppContext>()
+  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const navigate = useNavigate()
   const [items, setItems] = useState<MealPlanItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,12 +45,17 @@ export default function Week() {
 
   return (
     <div className="space-y-10">
-      <section>
-        <div className="eyebrow mb-3">This week</div>
-        <h2 className="text-4xl font-normal text-ink">Week view.</h2>
-        <p className="mt-2 text-sm text-muted">
-          {dayLong(dates[0])} to {dayLong(dates[6])}. Click a day to open it, or any dish for the recipe.
-        </p>
+      <section className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="eyebrow mb-3">Week view</div>
+          <h2 className="text-4xl font-normal text-ink">
+            {dayLong(dates[0])} – {dayLong(dates[6])}.
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            Click a day to open it, or any dish for the recipe.
+          </p>
+        </div>
+        <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
       </section>
 
       {loading ? (
@@ -69,7 +75,7 @@ export default function Week() {
                 <button
                   type="button"
                   aria-label={`Open ${dayLong(date)}`}
-                  onClick={() => navigate(`/day?date=${date}`)}
+                  onClick={() => navigate(`/day?week=${activeWeek.id}&date=${date}`)}
                   className="absolute inset-0 z-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ink/40"
                 />
                 <div className="pointer-events-none relative pt-1">

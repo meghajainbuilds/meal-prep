@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { AppContext } from '../App'
 import SignIn from '../components/SignIn'
+import WeekPicker from '../components/WeekPicker'
 import {
   addPrepItem, deletePrepItem, getPrepSessionsForWeek, PREP_ACTIONS,
   updatePrepItem, updatePrepSessionNotes,
@@ -9,7 +10,7 @@ import {
 } from '../lib/data'
 
 export default function Prep() {
-  const { session, activeWeek } = useOutletContext<AppContext>()
+  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const canEdit = !!session
 
   const [sessions, setSessions] = useState<PrepSession[]>([])
@@ -60,12 +61,15 @@ export default function Prep() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <div className="eyebrow mb-3">Prep sessions</div>
-        <h2 className="font-display text-5xl font-normal text-ink">Prep for the week.</h2>
-        <p className="mt-2 text-sm text-muted">
-          Two batches. Session 1 is the big weekend prep; Session 2 is a midweek refresh.
-        </p>
+      <section className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="eyebrow mb-3">Prep sessions</div>
+          <h2 className="font-display text-5xl font-normal text-ink">Prep for the week.</h2>
+          <p className="mt-2 text-sm text-muted">
+            Two batches. Session 1 is the big weekend prep; Session 2 is a midweek refresh.
+          </p>
+        </div>
+        <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
       </section>
 
       {loading ? (

@@ -7,6 +7,7 @@ import SampleMenuPicker from '../components/SampleMenuPicker'
 import PlannedEstimate from '../components/PlannedEstimate'
 import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
+import WeekPicker from '../components/WeekPicker'
 import {
   addMealPlanItem, applySampleMenu, clearSlotAteLog, deleteMealPlanItem,
   dayShort, dayNumber, getActualEatingForDate, getMealPlanForWeek,
@@ -18,7 +19,7 @@ import {
 const SLOTS: MealPlanItem['slot'][] = ['breakfast', 'midmorning', 'lunch', 'dinner', 'evening']
 
 export default function Day() {
-  const { session, activeWeek } = useOutletContext<AppContext>()
+  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const canEdit = !!session
 
   const [items, setItems] = useState<MealPlanItem[]>([])
@@ -40,7 +41,10 @@ export default function Day() {
     const today = new Date().toISOString().slice(0, 10)
     setActiveDate((prev) => {
       if (requested && dates.includes(requested)) return requested
-      return prev ?? dates.find((d) => d >= today) ?? dates[dates.length - 1]
+      // If the previously-chosen date belongs to this week, keep it;
+      // otherwise land on today-or-next, else the first day of the week.
+      if (prev && dates.includes(prev)) return prev
+      return dates.find((d) => d >= today) ?? dates[0]
     })
   }, [dates, searchParams])
 
@@ -158,22 +162,25 @@ export default function Day() {
             {activeDate ? formatLong(activeDate) : '—'}
           </h2>
         </div>
-        {canEdit && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="rounded-full border border-border bg-card px-4 py-2 text-sm text-ink hover:border-ink"
-            >
-              Apply a sample menu
-            </button>
-            <button
-              onClick={() => { setAddSlot('breakfast'); setAddOpen(true) }}
-              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink-soft"
-            >
-              + Add planned meal
-            </button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
+          {canEdit && (
+            <>
+              <button
+                onClick={() => setMenuOpen(true)}
+                className="rounded-full border border-border bg-card px-4 py-2 text-sm text-ink hover:border-ink"
+              >
+                Apply a sample menu
+              </button>
+              <button
+                onClick={() => { setAddSlot('breakfast'); setAddOpen(true) }}
+                className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface hover:bg-ink-soft"
+              >
+                + Add planned meal
+              </button>
+            </>
+          )}
+        </div>
       </section>
 
       {dates.length > 0 && (

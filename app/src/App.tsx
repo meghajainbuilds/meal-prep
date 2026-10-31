@@ -1,31 +1,44 @@
-import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Outlet, useSearchParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import Header from './components/Header'
 import Nav from './components/Nav'
 import Intro from './components/Intro'
-import { getLatestWeek, dayNumber, monthShort } from './lib/data'
-import type { Week as WeekT } from './lib/data'
+import { getAllWeeksWithItems, dayNumber, monthShort } from './lib/data'
+import type { Week as WeekT, WeekWithCount } from './lib/data'
 
 const OWNER_EMAIL = 'meghajain@outlook.com'
 
 export type AppContext = {
   session: Session | null
   activeWeek: WeekT | null
+  allWeeks: WeekWithCount[]
 }
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
-  const [activeWeek, setActiveWeek] = useState<WeekT | null>(null)
+  const [allWeeks, setAllWeeks] = useState<WeekWithCount[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
-    getLatestWeek().then((w) => { setActiveWeek(w); setLoading(false) })
+    getAllWeeksWithItems().then((ws) => { setAllWeeks(ws); setLoading(false) })
     return () => sub.subscription.unsubscribe()
   }, [])
+
+  const weekParam = searchParams.get('week')
+  const activeWeek: WeekT | null = useMemo(() => {
+    if (allWeeks.length === 0) return null
+    if (weekParam) {
+      const picked = allWeeks.find((w) => w.id === weekParam)
+      if (picked) return picked
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    return allWeeks.find((w) => w.week_start <= today) ?? allWeeks[0]
+  }, [weekParam, allWeeks])
 
   const subtitle = activeWeek
     ? `Week of ${monthShort(activeWeek.week_start)} ${dayNumber(activeWeek.week_start)} · v${activeWeek.version}`
@@ -62,7 +75,7 @@ export default function App() {
         {loading ? (
           <p className="text-muted">Loading…</p>
         ) : (
-          <Outlet context={{ session, activeWeek } satisfies AppContext} />
+          <Outlet context={{ session, activeWeek, allWeeks } satisfies AppContext} />
         )}
       </main>
       <footer className="border-t border-border bg-bg py-8">

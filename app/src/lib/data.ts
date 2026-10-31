@@ -165,21 +165,38 @@ export function weekDates(weekStart: string): string[] {
   })
 }
 
-export async function getLatestWeek(): Promise<Week | null> {
+export type WeekWithCount = Week & { item_count: number }
+
+// Returns every week that has at least one meal plan item, newest first.
+// Picker uses this so users can jump to any historical week (and visible
+// future drafts).
+export async function getAllWeeksWithItems(): Promise<WeekWithCount[]> {
   const { data: weeks } = await supabase
     .from('weeks')
     .select('id, week_start, version, notes')
     .order('week_start', { ascending: false })
     .order('version', { ascending: false })
-  if (!weeks || weeks.length === 0) return null
+  if (!weeks || weeks.length === 0) return []
+  const out: WeekWithCount[] = []
   for (const w of weeks as Week[]) {
     const { count } = await supabase
       .from('meal_plan_items')
       .select('id', { count: 'exact', head: true })
       .eq('week_id', w.id)
-    if ((count ?? 0) > 0) return w
+    if ((count ?? 0) > 0) out.push({ ...w, item_count: count ?? 0 })
   }
-  return (weeks[0] as Week) ?? null
+  return out
+}
+
+// Default-week pick: prefer the newest week whose week_start is today or
+// earlier (i.e. the current or most recent past week). Fall back to the
+// newest week overall only if no past-or-current week exists.
+export async function getLatestWeek(): Promise<Week | null> {
+  const weeks = await getAllWeeksWithItems()
+  if (weeks.length === 0) return null
+  const today = new Date().toISOString().slice(0, 10)
+  const pastOrCurrent = weeks.find((w) => w.week_start <= today)
+  return pastOrCurrent ?? weeks[0]
 }
 
 export async function getWeekByStart(weekStart: string): Promise<Week | null> {
