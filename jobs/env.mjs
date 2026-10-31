@@ -17,5 +17,9 @@ export const env = {
   SUPABASE_SERVICE_ROLE_KEY: need('SUPABASE_SERVICE_ROLE_KEY'),
   ANTHROPIC_API_KEY: need('ANTHROPIC_API_KEY'),
   AI_MODEL: process.env.AI_MODEL ?? 'claude-sonnet-5-5',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
+  IMAGE_MODEL: process.env.IMAGE_MODEL ?? 'gpt-image-1',
+  IMAGE_QUALITY: process.env.IMAGE_QUALITY ?? 'medium',
+  IMAGE_SIZE: process.env.IMAGE_SIZE ?? '1024x1024',
   TZ: process.env.TZ ?? 'America/Los_Angeles',
 }

@@ -30,9 +30,13 @@ export default function Recipes() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {recipes.map((r) => (
             <article key={r.id} className="overflow-hidden rounded-xl border border-border bg-card">
-              <div className="flex h-48 items-center justify-center bg-sage/60 text-5xl font-display text-ink/40">
-                {r.name.charAt(0)}
-              </div>
+              {r.image_url ? (
+                <img src={r.image_url} alt="" className="h-48 w-full object-cover" />
+              ) : (
+                <div className="flex h-48 items-center justify-center bg-sage/60 text-5xl font-display text-ink/40">
+                  {r.name.charAt(0)}
+                </div>
+              )}
               <div className="p-5">
                 {r.tags?.[0] && (
                   <div className="meta mb-2 flex items-center gap-2 text-muted">
