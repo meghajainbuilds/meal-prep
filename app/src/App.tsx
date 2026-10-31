@@ -37,20 +37,22 @@ export default function App() {
     <div className="min-h-screen bg-bg">
       <Header session={session} subtitle={subtitle} />
       {isVisitor && (
-        <div className="border-b border-border bg-sage/40">
-          <div className="mx-auto max-w-7xl px-6 py-3 md:px-10">
-            <p className="text-sm text-ink">
-              You're viewing Megha's meal plan, read-only. Want to build your own?{' '}
-              <a
-                href="https://github.com/meghajainbuilds/meal-prep"
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium underline"
-              >
-                Fork the repo
-              </a>{' '}
-              and run your own copy.
+        <div className="border-y-2 border-accent bg-accent text-surface shadow-sm">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3 md:px-10">
+            <p className="text-sm font-medium">
+              <span className="mr-2 rounded bg-surface/20 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider">
+                Read only
+              </span>
+              You're viewing Megha's meal plan. Want your own copy?
             </p>
+            <a
+              href="https://github.com/meghajainbuilds/meal-prep"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-surface px-4 py-1.5 text-sm font-semibold text-accent hover:bg-surface/90"
+            >
+              Fork the repo →
+            </a>
           </div>
         </div>
       )}

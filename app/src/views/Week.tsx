@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { AppContext } from '../App'
 import DishChip from '../components/DishChip'
+import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
 import {
   dayLong, dayShort, dayNumber,
@@ -18,8 +19,10 @@ const COLS: { slot: MealPlanItem['slot']; label: string }[] = [
 
 export default function Week() {
   const { session, activeWeek } = useOutletContext<AppContext>()
+  const navigate = useNavigate()
   const [items, setItems] = useState<MealPlanItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [openRecipe, setOpenRecipe] = useState<string | null>(null)
 
   useEffect(() => {
     if (!activeWeek) { setLoading(false); return }
@@ -45,7 +48,7 @@ export default function Week() {
         <div className="eyebrow mb-3">This week</div>
         <h2 className="text-4xl font-normal text-ink">Week view.</h2>
         <p className="mt-2 text-sm text-muted">
-          {dayLong(dates[0])} to {dayLong(dates[6])}. Click a day to open it.
+          {dayLong(dates[0])} to {dayLong(dates[6])}. Click a day to open it, or any dish for the recipe.
         </p>
       </section>
 
@@ -59,11 +62,17 @@ export default function Week() {
               <div
                 key={date}
                 className={
-                  'grid grid-cols-[7rem_1fr_1fr_1fr_2rem] gap-4 border-b border-border p-6 last:border-b-0 ' +
+                  'relative grid grid-cols-[7rem_1fr_1fr_1fr_2rem] gap-4 border-b border-border p-6 last:border-b-0 transition hover:bg-sage/20 ' +
                   (idx % 2 === 1 ? 'bg-surface/60' : '')
                 }
               >
-                <div className="pt-1">
+                <button
+                  type="button"
+                  aria-label={`Open ${dayLong(date)}`}
+                  onClick={() => navigate(`/day?date=${date}`)}
+                  className="absolute inset-0 z-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ink/40"
+                />
+                <div className="pointer-events-none relative pt-1">
                   <div className="font-display text-3xl text-ink">
                     {dayShort(date)}
                   </div>
@@ -75,7 +84,7 @@ export default function Week() {
                 {COLS.map(({ slot, label }) => {
                   const slotItems = daySlots.get(slot) ?? []
                   return (
-                    <div key={slot}>
+                    <div key={slot} className="relative">
                       <div className="meta mb-3 text-muted" style={{ letterSpacing: '0.14em' }}>
                         {label}
                       </div>
@@ -84,10 +93,11 @@ export default function Week() {
                       ) : (
                         <ul className="space-y-2.5">
                           {slotItems.map((item) => (
-                            <li key={item.id}>
+                            <li key={item.id} className="relative z-10">
                               <DishChip
                                 name={item.display_name ?? item.recipe?.name ?? 'Untitled'}
                                 imageUrl={item.recipe?.image_url}
+                                onClick={item.recipe_id ? () => setOpenRecipe(item.recipe_id!) : undefined}
                               />
                             </li>
                           ))}
@@ -97,9 +107,9 @@ export default function Week() {
                   )
                 })}
 
-                <div className="pt-2 text-right">
+                <div className="pointer-events-none relative pt-2 text-right">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-ink/60">
-                    ↗
+                    →
                   </span>
                 </div>
               </div>
@@ -113,6 +123,8 @@ export default function Week() {
           <SignIn />
         </div>
       )}
+
+      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} />
     </div>
   )
 }

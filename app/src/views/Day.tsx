@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import type { AppContext } from '../App'
 import MealCard from '../components/MealCard'
 import AddDishModal from '../components/AddDishModal'
 import SampleMenuPicker from '../components/SampleMenuPicker'
 import PlannedEstimate from '../components/PlannedEstimate'
+import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
 import {
   addMealPlanItem, applySampleMenu, clearSlotAteLog, deleteMealPlanItem,
@@ -28,14 +29,25 @@ export default function Day() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeDate, setActiveDate] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [openRecipe, setOpenRecipe] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const dates = useMemo(() => (activeWeek ? weekDates(activeWeek.week_start) : []), [activeWeek?.week_start])
 
   useEffect(() => {
     if (dates.length === 0) return
+    const requested = searchParams.get('date')
     const today = new Date().toISOString().slice(0, 10)
-    setActiveDate((prev) => prev ?? dates.find((d) => d >= today) ?? dates[dates.length - 1])
-  }, [dates])
+    setActiveDate((prev) => {
+      if (requested && dates.includes(requested)) return requested
+      return prev ?? dates.find((d) => d >= today) ?? dates[dates.length - 1]
+    })
+  }, [dates, searchParams])
+
+  function pickDate(d: string) {
+    setActiveDate(d)
+    setSearchParams({ date: d }, { replace: true })
+  }
 
   const refreshPlan = useCallback(async () => {
     if (!activeWeek) return
@@ -171,7 +183,7 @@ export default function Day() {
             return (
               <button
                 key={d}
-                onClick={() => setActiveDate(d)}
+                onClick={() => pickDate(d)}
                 className={
                   'rounded-md border px-3 py-3 text-center transition ' +
                   (isActive
@@ -231,6 +243,7 @@ export default function Day() {
                     onRemoveItem={handleRemove}
                     onEditPlateNote={(text) => handlePlateNote(slot, text)}
                     onAteChange={(status, notes) => handleAte(slot, status, notes)}
+                    onDishClick={(recipeId) => setOpenRecipe(recipeId)}
                   />
                 </div>
               </li>
@@ -252,6 +265,7 @@ export default function Day() {
         onClose={() => setMenuOpen(false)}
         onApply={handleApplyMenu}
       />
+      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} />
     </div>
   )
 }

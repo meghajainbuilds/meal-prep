@@ -4,6 +4,7 @@ Single-user meal-planning web app for Megha, built on the build-it-yourself-harn
 
 ## Read first
 - `MAP.md` — living project map: block state, admin URLs, next-session queue, known gotchas. **Always read before acting.**
+- `.claude/requirements.md` — the owner's personal meal-planning requirements (gitignored). **Load before building, editing, or generating ANY menu / recipe / prep / shopping content, or any AI prompt that produces meal content.** The committed `.claude/requirements.example.md` shows the shape for forkers.
 - `harness.config.json` — chosen blocks and defaults.
 - `~/.claude/projects/-Users-meghajain-Projects-Meal-prep/memory/MEMORY.md` — index of saved project memories (auto-loads).
 

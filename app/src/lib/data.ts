@@ -11,6 +11,29 @@ export type Recipe = {
   source_link: string | null
 }
 
+export type RecipeFull = Recipe & {
+  source_chef: string | null
+  ingredients: string[]
+  method: string | null
+  favorite_reason: string | null
+  adaptations: string | null
+  sesame_safe: boolean
+}
+
+export async function getRecipeById(id: string): Promise<RecipeFull | null> {
+  const { data } = await supabase
+    .from('recipes')
+    .select('id, name, description, image_url, tags, cuisine, is_favorite, source_link, source_chef, ingredients, method, favorite_reason, adaptations, sesame_safe')
+    .eq('id', id)
+    .maybeSingle()
+  if (!data) return null
+  const raw = data as Record<string, unknown>
+  const ing = Array.isArray(raw.ingredients)
+    ? (raw.ingredients as unknown[]).map(String)
+    : []
+  return { ...(raw as unknown as RecipeFull), ingredients: ing }
+}
+
 export type Week = {
   id: string
   week_start: string

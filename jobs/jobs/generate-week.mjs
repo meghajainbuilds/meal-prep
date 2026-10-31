@@ -1,32 +1,198 @@
+import { readFileSync, existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
 import { db } from '../db.mjs'
+import { ask } from '../claude.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const REQ_PATH = resolve(here, '..', '..', '.claude', 'requirements.md')
+
+const SLOTS = ['breakfast', 'midmorning', 'lunch', 'dinner', 'evening']
+const SLOT_TIMES = {
+  breakfast: '8:30 am',
+  midmorning: '12:00 pm (fruit + nuts/seeds)',
+  lunch: '2:00 pm',
+  dinner: '5:30 pm',
+  evening: '8:30 pm (optional)',
+}
 
 export default async function generateWeek() {
   const monday = nextMonday()
   const weekStart = monday.toISOString().slice(0, 10)
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setUTCDate(d.getUTCDate() + i)
+    return d.toISOString().slice(0, 10)
+  })
 
-  const { data: existing } = await db
+  if (!existsSync(REQ_PATH)) {
+    throw new Error(
+      `Requirements doc not found at ${REQ_PATH}. ` +
+      `Copy .claude/requirements.example.md to .claude/requirements.md and fill in your values before generating weeks.`,
+    )
+  }
+  const requirements = readFileSync(REQ_PATH, 'utf8')
+
+  const { data: existingVersions } = await db
     .from('weeks')
     .select('id, version')
     .eq('week_start', weekStart)
     .order('version', { ascending: false })
     .limit(1)
-    .maybeSingle()
+  const nextVersion = (existingVersions?.[0]?.version ?? 0) + 1
 
-  if (existing) {
-    return { skipped: true, reason: `Week ${weekStart} already exists at v${existing.version}` }
+  const { data: recipeRows } = await db
+    .from('recipes')
+    .select('id, name, cuisine, description, tags')
+    .order('name', { ascending: true })
+  const recipes = recipeRows ?? []
+  const recipeCatalog = recipes
+    .map((r) => `- ${r.name}${r.cuisine ? ` (${r.cuisine})` : ''}${r.description ? ` — ${r.description}` : ''}`)
+    .join('\n')
+
+  const { data: priorPlans } = await db
+    .from('meal_plan_items')
+    .select('day_date, slot, display_name, recipe:recipes(name)')
+    .lt('day_date', weekStart)
+    .gte('day_date', shiftDays(weekStart, -14))
+    .order('day_date', { ascending: true })
+  const priorSummary = summarizePriorWeeks(priorPlans ?? [])
+
+  const system = [
+    'You are planning a weekly meal menu for a household based on the owner\'s private requirements document.',
+    'Honor every rule in the requirements. The requirements are the source of truth; do not invent constraints or override explicit rules.',
+    'When a rule conflicts with a preference, follow the rule. When the requirements are silent on a choice, pick what best fits the stated goals.',
+    'Prefer referencing recipes from the catalog by exact name. If no catalog recipe fits a slot, invent a short descriptive dish name (not a numbered label).',
+    'Keep rice, roti and roots in the menu as plate components where appropriate — do NOT drop them under "low carb".',
+    'The output is JSON only — no prose before or after. Do not wrap in markdown fences.',
+    '',
+    '--- REQUIREMENTS DOCUMENT ---',
+    requirements,
+    '--- END REQUIREMENTS DOCUMENT ---',
+  ].join('\n')
+
+  const user = [
+    `Plan the week starting Monday ${weekStart} (dates: ${dates.join(', ')}).`,
+    `There are five slots per day: ${SLOTS.join(', ')}. Slot times are:`,
+    Object.entries(SLOT_TIMES).map(([k, v]) => `  - ${k}: ${v}`).join('\n'),
+    '',
+    'RECIPE CATALOG (reference by exact name when it fits):',
+    recipeCatalog || '(empty)',
+    '',
+    priorSummary
+      ? `PRIOR TWO WEEKS (for variety; vary meaningfully from these without ignoring favorites):\n${priorSummary}`
+      : 'No prior weeks on record.',
+    '',
+    'OUTPUT: a JSON object with this exact shape:',
+    '{',
+    '  "rationale": "2-4 sentences explaining how this week honors the goals (protein distribution, fibre, roots, sesame-free, fish rules, cuisine rotation, variety from prior weeks).",',
+    '  "items": [',
+    '    { "day_date": "YYYY-MM-DD", "slot": "breakfast|midmorning|lunch|dinner|evening", "dishes": [',
+    '      { "name": "exact catalog recipe name OR descriptive new dish name", "notes": "optional plate guidance for Megha only" }',
+    '    ] }',
+    '  ]',
+    '}',
+    '',
+    'Every day must have all 5 slots. A slot may legitimately have one dish or several. The midmorning slot is simply "Fruit + nuts" by default unless something explicit varies it.',
+  ].join('\n')
+
+  console.log(`Asking Claude to plan week ${weekStart} (v${nextVersion})…`)
+  const raw = await ask(user, { system, max_tokens: 8000 })
+  const parsed = parseJsonResponse(raw)
+  if (!parsed?.items || !Array.isArray(parsed.items)) {
+    throw new Error(`Claude response missing items array. Raw first 300 chars: ${raw.slice(0, 300)}`)
   }
 
-  const { data, error } = await db
+  const recipesByLowerName = new Map(recipes.map((r) => [r.name.trim().toLowerCase(), r.id]))
+
+  const { data: weekRow, error: weekErr } = await db
     .from('weeks')
     .insert({
       week_start: weekStart,
-      version: 1,
-      notes: 'Draft generated by Friday scheduled job. Full meal-plan generation lands with the planner UI.',
+      version: nextVersion,
+      notes: parsed.rationale ?? 'Generated by generate-week via Claude.',
     })
     .select('id, week_start, version')
     .single()
-  if (error) throw error
-  return { created: data }
+  if (weekErr) throw weekErr
+
+  const inserts = []
+  for (const slotPlan of parsed.items) {
+    const day = slotPlan.day_date
+    const slot = slotPlan.slot
+    if (!dates.includes(day)) continue
+    if (!SLOTS.includes(slot)) continue
+    const dishes = Array.isArray(slotPlan.dishes) ? slotPlan.dishes : []
+    dishes.forEach((d, idx) => {
+      const name = String(d?.name ?? '').trim()
+      if (!name) return
+      const recipeId = recipesByLowerName.get(name.toLowerCase()) ?? null
+      inserts.push({
+        week_id: weekRow.id,
+        day_date: day,
+        slot,
+        recipe_id: recipeId,
+        display_name: recipeId ? null : name,
+        custom_notes: typeof d?.notes === 'string' && d.notes.trim() ? d.notes.trim() : null,
+        order_index: idx,
+      })
+    })
+  }
+
+  if (inserts.length === 0) {
+    throw new Error('No valid items parsed from Claude response.')
+  }
+
+  const { error: itemsErr } = await db.from('meal_plan_items').insert(inserts)
+  if (itemsErr) throw itemsErr
+
+  return {
+    created: weekRow,
+    item_count: inserts.length,
+    rationale: parsed.rationale ?? null,
+  }
+}
+
+function parseJsonResponse(raw) {
+  const trimmed = raw.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      try { return JSON.parse(trimmed.slice(start, end + 1)) } catch { /* fall through */ }
+    }
+    return null
+  }
+}
+
+function summarizePriorWeeks(rows) {
+  if (rows.length === 0) return ''
+  const byDay = new Map()
+  for (const r of rows) {
+    const name = r.recipe?.name ?? r.display_name
+    if (!name) continue
+    const key = `${r.day_date} ${r.slot}`
+    if (!byDay.has(key)) byDay.set(key, [])
+    byDay.get(key).push(name)
+  }
+  const dayDates = [...new Set(rows.map((r) => r.day_date))].sort()
+  const lines = []
+  for (const d of dayDates) {
+    const perSlot = SLOTS.map((s) => {
+      const dishes = byDay.get(`${d} ${s}`) ?? []
+      return dishes.length ? `${s}: ${dishes.join(' + ')}` : null
+    }).filter(Boolean)
+    lines.push(`${d}: ${perSlot.join(' | ')}`)
+  }
+  return lines.join('\n')
+}
+
+function shiftDays(iso, days) {
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 function nextMonday() {

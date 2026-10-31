@@ -2,6 +2,7 @@ type Props = {
   name: string
   imageUrl?: string | null
   size?: 'sm' | 'md'
+  onClick?: () => void
 }
 
 const COLORS = ['#c8cfa8', '#d9c6a8', '#c4b4a3', '#b9c7b0', '#d8b89f', '#c6c1a4']
@@ -12,13 +13,13 @@ function hash(s: string): number {
   return h
 }
 
-export default function DishChip({ name, imageUrl, size = 'sm' }: Props) {
+export default function DishChip({ name, imageUrl, size = 'sm', onClick }: Props) {
   const dim = size === 'md' ? 44 : 32
   const bg = COLORS[hash(name) % COLORS.length]
   const initial = name.replace(/[^A-Za-z]/g, '').charAt(0).toUpperCase() || '•'
 
-  return (
-    <div className="flex items-center gap-3">
+  const content = (
+    <>
       {imageUrl ? (
         <img
           src={imageUrl}
@@ -37,7 +38,21 @@ export default function DishChip({ name, imageUrl, size = 'sm' }: Props) {
           {initial}
         </div>
       )}
-      <span className="truncate text-sm text-ink-soft">{name}</span>
-    </div>
+      <span className="truncate text-left text-sm text-ink-soft">{name}</span>
+    </>
   )
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="group flex w-full items-center gap-3 rounded-md -mx-1 px-1 py-0.5 text-left hover:bg-sage/40 focus:bg-sage/40 focus:outline-none"
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return <div className="flex items-center gap-3">{content}</div>
 }

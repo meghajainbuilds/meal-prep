@@ -11,3 +11,8 @@ dist/
 .idea/
 .turbo/
 .cache/
+
+# Private planning doc (personal health context). The committed template
+# `.claude/requirements.example.md` shows the shape; each owner fills in their
+# own values in `.claude/requirements.md` which stays local.
+.claude/requirements.md

@@ -13,11 +13,12 @@ type Props = {
   onRemoveItem: (id: string) => void
   onEditPlateNote: (plateText: string) => void
   onAteChange: (status: AteStatus | null, notes: string | null) => void
+  onDishClick?: (recipeId: string) => void
 }
 
 export default function MealCard({
   slotLabel, slotTime, items, canEdit,
-  ate, onAddDish, onRemoveItem, onEditPlateNote, onAteChange,
+  ate, onAddDish, onRemoveItem, onEditPlateNote, onAteChange, onDishClick,
 }: Props) {
   const firstItem = items[0]
   const [plateText, setPlateText] = useState(firstItem?.custom_notes ?? '')
@@ -71,6 +72,7 @@ export default function MealCard({
                     name={item.display_name ?? item.recipe?.name ?? 'Untitled'}
                     imageUrl={item.recipe?.image_url}
                     size="md"
+                    onClick={item.recipe_id && onDishClick ? () => onDishClick(item.recipe_id!) : undefined}
                   />
                   {canEdit && (
                     <button
