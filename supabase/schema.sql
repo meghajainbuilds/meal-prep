@@ -124,9 +124,11 @@ create table if not exists prep_items (
   action text not null check (action in ('chop','roast','cook')),
   image_url text,
   order_index int not null default 0,
+  done boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table prep_items add column if not exists done boolean not null default false;
 create index if not exists idx_prep_items_session on prep_items(session_id);
 drop trigger if exists trg_prep_items_updated_at on prep_items;
 create trigger trg_prep_items_updated_at before update on prep_items

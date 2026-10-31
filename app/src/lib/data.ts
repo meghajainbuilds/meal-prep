@@ -320,6 +320,96 @@ export async function upsertSlotAteLog(args: {
   return inserted!.id as string
 }
 
+export type PrepAction = 'chop' | 'roast' | 'cook'
+
+export type PrepItem = {
+  id: string
+  session_id: string
+  ingredient_name: string
+  total_quantity: string | null
+  cut_style: string | null
+  action: PrepAction
+  image_url: string | null
+  order_index: number
+  done: boolean
+}
+
+export type PrepSession = {
+  id: string
+  week_id: string
+  session_number: 1 | 2
+  day_hint: string | null
+  notes: string | null
+  items: PrepItem[]
+}
+
+export const PREP_ACTIONS: { key: PrepAction; label: string }[] = [
+  { key: 'chop', label: 'Chop' },
+  { key: 'roast', label: 'Roast' },
+  { key: 'cook', label: 'Cook' },
+]
+
+export async function getPrepSessionsForWeek(weekId: string): Promise<PrepSession[]> {
+  const { data: sessions } = await supabase
+    .from('prep_sessions')
+    .select('id, week_id, session_number, day_hint, notes')
+    .eq('week_id', weekId)
+    .order('session_number', { ascending: true })
+  if (!sessions || sessions.length === 0) return []
+
+  const ids = sessions.map((s) => s.id)
+  const { data: items } = await supabase
+    .from('prep_items')
+    .select('id, session_id, ingredient_name, total_quantity, cut_style, action, image_url, order_index, done')
+    .in('session_id', ids)
+    .order('order_index', { ascending: true })
+
+  const bySession = new Map<string, PrepItem[]>()
+  for (const row of (items ?? []) as PrepItem[]) {
+    if (!bySession.has(row.session_id)) bySession.set(row.session_id, [])
+    bySession.get(row.session_id)!.push(row)
+  }
+  return (sessions as Omit<PrepSession, 'items'>[]).map((s) => ({
+    ...s,
+    items: bySession.get(s.id) ?? [],
+  }))
+}
+
+export async function updatePrepItem(id: string, patch: Partial<Pick<PrepItem, 'done' | 'ingredient_name' | 'total_quantity' | 'cut_style' | 'session_id' | 'action'>>) {
+  const { error } = await supabase.from('prep_items').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+export async function deletePrepItem(id: string) {
+  const { error } = await supabase.from('prep_items').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function addPrepItem(args: {
+  session_id: string
+  action: PrepAction
+  ingredient_name: string
+  total_quantity?: string | null
+  cut_style?: string | null
+  order_index?: number
+}) {
+  const { error } = await supabase.from('prep_items').insert({
+    session_id: args.session_id,
+    action: args.action,
+    ingredient_name: args.ingredient_name,
+    total_quantity: args.total_quantity ?? null,
+    cut_style: args.cut_style ?? null,
+    order_index: args.order_index ?? 0,
+    done: false,
+  })
+  if (error) throw error
+}
+
+export async function updatePrepSessionNotes(id: string, notes: string) {
+  const { error } = await supabase.from('prep_sessions').update({ notes }).eq('id', id)
+  if (error) throw error
+}
+
 export type ShoppingItem = {
   id: string
   week_id: string
