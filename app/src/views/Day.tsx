@@ -7,11 +7,11 @@ import SampleMenuPicker from '../components/SampleMenuPicker'
 import PlannedEstimate from '../components/PlannedEstimate'
 import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
-import WeekPicker from '../components/WeekPicker'
+import DatePicker from '../components/DatePicker'
 import {
   addMealPlanItem, applySampleMenu, clearSlotAteLog, deleteMealPlanItem,
   dayShort, dayNumber, getActualEatingForDate, getMealPlanForWeek,
-  groupBySlot, SLOT_LABEL, SLOT_TIME, updateMealPlanItem, upsertSlotAteLog,
+  groupBySlot, mondayOf, SLOT_LABEL, SLOT_TIME, updateMealPlanItem, upsertSlotAteLog,
   weekDates,
   type ActualEatingLog, type AteStatus, type MealPlanItem,
 } from '../lib/data'
@@ -48,9 +48,18 @@ export default function Day() {
     })
   }, [dates, searchParams])
 
+  const [pickerError, setPickerError] = useState<string | null>(null)
+
   function pickDate(d: string) {
-    setActiveDate(d)
-    setSearchParams({ date: d }, { replace: true })
+    const weekStart = mondayOf(d)
+    const target = allWeeks.find((w) => w.week_start === weekStart)
+    if (target) {
+      setPickerError(null)
+      setActiveDate(d)
+      setSearchParams({ week: target.id, date: d }, { replace: false })
+    } else {
+      setPickerError(`No plan for the week of ${weekStart} yet.`)
+    }
   }
 
   const refreshPlan = useCallback(async () => {
@@ -162,8 +171,10 @@ export default function Day() {
             {activeDate ? formatLong(activeDate) : '—'}
           </h2>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
+        <div className="flex flex-wrap items-end gap-3">
+          {activeDate && (
+            <DatePicker date={activeDate} onChange={pickDate} stepDays={1} />
+          )}
           {canEdit && (
             <>
               <button
@@ -182,6 +193,9 @@ export default function Day() {
           )}
         </div>
       </section>
+      {pickerError && (
+        <p className="text-sm text-accent">{pickerError}</p>
+      )}
 
       {dates.length > 0 && (
         <div className="grid grid-cols-7 gap-2">

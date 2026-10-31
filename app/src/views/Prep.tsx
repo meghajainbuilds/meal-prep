@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import type { AppContext } from '../App'
 import SignIn from '../components/SignIn'
-import WeekPicker from '../components/WeekPicker'
+import DatePicker from '../components/DatePicker'
 import {
-  addPrepItem, deletePrepItem, getPrepSessionsForWeek, PREP_ACTIONS,
+  addPrepItem, dayNumber, deletePrepItem, getPrepSessionsForWeek,
+  mondayOf, monthShort, PREP_ACTIONS,
   updatePrepItem, updatePrepSessionNotes,
   type PrepAction, type PrepItem, type PrepSession,
 } from '../lib/data'
@@ -12,6 +13,19 @@ import {
 export default function Prep() {
   const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const canEdit = !!session
+  const [, setSearchParams] = useSearchParams()
+  const [pickerError, setPickerError] = useState<string | null>(null)
+
+  function onDateChange(iso: string) {
+    const weekStart = mondayOf(iso)
+    const target = allWeeks.find((w) => w.week_start === weekStart)
+    if (target) {
+      setPickerError(null)
+      setSearchParams({ week: target.id })
+    } else {
+      setPickerError(`No plan for the week of ${monthShort(weekStart)} ${dayNumber(weekStart)} yet.`)
+    }
+  }
 
   const [sessions, setSessions] = useState<PrepSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -69,8 +83,13 @@ export default function Prep() {
             Two batches. Session 1 is the big weekend prep; Session 2 is a midweek refresh.
           </p>
         </div>
-        <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
+        {activeWeek && (
+          <DatePicker date={activeWeek.week_start} onChange={onDateChange} stepDays={7} />
+        )}
       </section>
+      {pickerError && (
+        <p className="text-sm text-accent">{pickerError}</p>
+      )}
 
       {loading ? (
         <p className="text-muted">Loading prep…</p>

@@ -156,6 +156,16 @@ export function monthShort(iso: string) {
   return d.toLocaleString('en-US', { month: 'short' })
 }
 
+// Returns the ISO date of the Monday on-or-before `iso`.
+// JS: 0 = Sunday, 1 = Monday, ... 6 = Saturday.
+export function mondayOf(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z')
+  const dow = d.getUTCDay()
+  const shift = dow === 0 ? -6 : 1 - dow
+  d.setUTCDate(d.getUTCDate() + shift)
+  return d.toISOString().slice(0, 10)
+}
+
 export function weekDates(weekStart: string): string[] {
   const start = new Date(weekStart + 'T00:00:00')
   return Array.from({ length: 7 }, (_, i) => {

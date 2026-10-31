@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import type { AppContext } from '../App'
 import IngredientCategory from '../components/IngredientCategory'
 import SignIn from '../components/SignIn'
-import WeekPicker from '../components/WeekPicker'
+import DatePicker from '../components/DatePicker'
 import {
-  dayLong, getShoppingItemsForWeek, INGREDIENT_CATEGORIES, updateShoppingItem,
+  dayLong, dayNumber, getShoppingItemsForWeek, INGREDIENT_CATEGORIES,
+  mondayOf, monthShort, updateShoppingItem,
   type ShoppingItem,
 } from '../lib/data'
 
@@ -14,6 +15,7 @@ type Filter = 'all' | 'check'
 export default function Ingredients() {
   const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const canEdit = !!session
+  const [, setSearchParams] = useSearchParams()
 
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +24,18 @@ export default function Ingredients() {
     fresh: true, pantry: false, alternatives: false,
   })
   const [error, setError] = useState<string | null>(null)
+  const [pickerError, setPickerError] = useState<string | null>(null)
+
+  function onDateChange(iso: string) {
+    const weekStart = mondayOf(iso)
+    const target = allWeeks.find((w) => w.week_start === weekStart)
+    if (target) {
+      setPickerError(null)
+      setSearchParams({ week: target.id })
+    } else {
+      setPickerError(`No plan for the week of ${monthShort(weekStart)} ${dayNumber(weekStart)} yet.`)
+    }
+  }
 
   useEffect(() => {
     if (!activeWeek) { setLoading(false); return }
@@ -96,16 +110,21 @@ export default function Ingredients() {
             <h2 className="font-display text-5xl font-normal text-ink">Ingredients.</h2>
             <p className="mt-1 text-sm text-muted">{weekLabel}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
+          <div className="flex items-end gap-3">
+            {activeWeek && (
+              <DatePicker date={activeWeek.week_start} onChange={onDateChange} stepDays={7} />
+            )}
             <button
               onClick={() => window.print()}
-              className="hidden rounded-full border border-border bg-card px-4 py-2 text-sm text-ink hover:border-ink md:inline-flex"
+              className="hidden h-9 rounded-full border border-border bg-card px-4 text-sm text-ink hover:border-ink md:inline-flex md:items-center"
             >
               Print list ↗
             </button>
           </div>
         </div>
+        {pickerError && (
+          <p className="mt-3 text-sm text-accent">{pickerError}</p>
+        )}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-4">

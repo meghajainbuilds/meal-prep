@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import type { AppContext } from '../App'
 import DishChip from '../components/DishChip'
 import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
-import WeekPicker from '../components/WeekPicker'
+import DatePicker from '../components/DatePicker'
 import {
-  dayLong, dayShort, dayNumber,
+  dayShort, dayLong, dayNumber, monthShort,
   getMealPlanForWeek, groupByDay, groupBySlot,
-  weekDates,
+  mondayOf, weekDates,
   type MealPlanItem,
 } from '../lib/data'
 
@@ -21,9 +21,22 @@ const COLS: { slot: MealPlanItem['slot']; label: string }[] = [
 export default function Week() {
   const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
   const navigate = useNavigate()
+  const [, setSearchParams] = useSearchParams()
   const [items, setItems] = useState<MealPlanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [openRecipe, setOpenRecipe] = useState<string | null>(null)
+  const [pickerError, setPickerError] = useState<string | null>(null)
+
+  function onDateChange(iso: string) {
+    const weekStart = mondayOf(iso)
+    const target = allWeeks.find((w) => w.week_start === weekStart)
+    if (target) {
+      setPickerError(null)
+      setSearchParams({ week: target.id })
+    } else {
+      setPickerError(`No plan generated for the week of ${monthShort(weekStart)} ${dayNumber(weekStart)} yet.`)
+    }
+  }
 
   useEffect(() => {
     if (!activeWeek) { setLoading(false); return }
@@ -45,17 +58,19 @@ export default function Week() {
 
   return (
     <div className="space-y-10">
-      <section className="flex flex-wrap items-end justify-between gap-4">
+      <section className="space-y-6">
         <div>
-          <div className="eyebrow mb-3">Week view</div>
-          <h2 className="text-4xl font-normal text-ink">
-            {dayLong(dates[0])} – {dayLong(dates[6])}.
+          <div className="eyebrow mb-3">Weekly menu</div>
+          <h2 className="font-display text-4xl font-normal text-ink md:text-5xl">
+            Week of {dayShort(activeWeek.week_start)}, {monthShort(activeWeek.week_start)} {dayNumber(activeWeek.week_start)}, {activeWeek.week_start.slice(0, 4)}.
           </h2>
-          <p className="mt-2 text-sm text-muted">
-            Click a day to open it, or any dish for the recipe.
-          </p>
         </div>
-        <WeekPicker activeWeek={activeWeek} allWeeks={allWeeks} />
+        <div className="flex flex-wrap items-end gap-4">
+          <DatePicker date={activeWeek.week_start} onChange={onDateChange} stepDays={7} />
+        </div>
+        {pickerError && (
+          <p className="text-sm text-accent">{pickerError}</p>
+        )}
       </section>
 
       {loading ? (

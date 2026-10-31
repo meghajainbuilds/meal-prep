@@ -41,7 +41,7 @@ export default function App() {
   }, [weekParam, allWeeks])
 
   const subtitle = activeWeek
-    ? `Week of ${monthShort(activeWeek.week_start)} ${dayNumber(activeWeek.week_start)} · v${activeWeek.version}`
+    ? `Week of ${monthShort(activeWeek.week_start)} ${dayNumber(activeWeek.week_start)}`
     : undefined
 
   const isVisitor = !!session?.user?.email && session.user.email !== OWNER_EMAIL
