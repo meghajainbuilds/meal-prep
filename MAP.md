@@ -35,7 +35,7 @@
 - Logs: `tail -f jobs/logs/<job>.log` (also `jobs/logs/launchd.<job>.err` for launchd-level failures)
 - Reload all schedules: `bash scripts/install-launchd.sh`
 - Unload one: `launchctl bootout "gui/$UID/com.megha.mealprep.<job>"`
-- Deploy app: `cd app && NETLIFY_AUTH_TOKEN=$NETLIFY_AUTH_TOKEN npx netlify-cli deploy --prod --dir=dist --functions=netlify/functions --site 4cf9246b-652b-4786-8ef2-6df189d5c079`
+- Deploy app: `source .env && cd app && npx netlify-cli deploy --prod --dir=dist --functions=netlify/functions --site 4cf9246b-652b-4786-8ef2-6df189d5c079 --auth "$NETLIFY_AUTH_TOKEN"` (pass `--auth` explicitly; env var alone is ignored by recent netlify-cli versions)
 - Energy settings (required so schedules fire): System Settings → Battery → Options → "Prevent automatic sleeping on power adapter when the display is off" ON; "Wake for network access" ON. Stay signed in.
 
 ## Settings (names only)
