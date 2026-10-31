@@ -9,7 +9,7 @@ import RecipeModal from '../components/RecipeModal'
 import SignIn from '../components/SignIn'
 import DatePicker from '../components/DatePicker'
 import {
-  addMealPlanItem, applySampleMenu, clearSlotAteLog, deleteMealPlanItem,
+  addMealPlanItem, applySampleMenu, clearItemAteLog, clearSlotAteLog, clearSlotItems,
   dayShort, dayNumber, getActualEatingForDate, getMealPlanForWeek,
   groupBySlot, mondayOf, SLOT_LABEL, SLOT_TIME, updateMealPlanItem, upsertSlotAteLog,
   weekDates,
@@ -96,8 +96,10 @@ export default function Day() {
   const dayItems = activeDate ? items.filter((i) => i.day_date === activeDate) : []
   const bySlot = groupBySlot(dayItems)
   const ateBySlot = new Map<string, ActualEatingLog>()
+  const ateByItemId = new Map<string, ActualEatingLog>()
   for (const a of ateLogs) {
     if (a.item_name === '__slot__') ateBySlot.set(a.slot, a)
+    else ateByItemId.set(a.item_name, a)
   }
 
   async function handleAddDish(payload: Parameters<Parameters<typeof AddDishModal>[0]['onSubmit']>[0]) {
@@ -118,10 +120,25 @@ export default function Day() {
     }
   }
 
-  async function handleRemove(id: string) {
+  async function handleRemoveSlot(slot: MealPlanItem['slot']) {
+    if (!activeWeek || !activeDate) return
     try {
-      await deleteMealPlanItem(id)
+      await clearSlotItems(activeWeek.id, activeDate, slot)
       await refreshPlan()
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    }
+  }
+
+  async function handleItemAte(itemId: string, slot: MealPlanItem['slot'], checked: boolean) {
+    if (!activeDate) return
+    try {
+      if (checked) {
+        await upsertSlotAteLog({ day_date: activeDate, slot, status: 'as_planned', item_name: itemId })
+      } else {
+        await clearItemAteLog(activeDate, slot, itemId)
+      }
+      await refreshAte(activeDate)
     } catch (e) {
       setError(String((e as Error).message ?? e))
     }
@@ -260,10 +277,12 @@ export default function Day() {
                     items={bySlot.get(slot) ?? []}
                     canEdit={canEdit}
                     ate={ateBySlot.get(slot) ?? null}
+                    ateByItemId={ateByItemId}
                     onAddDish={() => { setAddSlot(slot); setAddOpen(true) }}
-                    onRemoveItem={handleRemove}
+                    onRemoveSlot={() => handleRemoveSlot(slot)}
                     onEditPlateNote={(text) => handlePlateNote(slot, text)}
                     onAteChange={(status, notes) => handleAte(slot, status, notes)}
+                    onItemAteChange={(itemId, checked) => handleItemAte(itemId, slot, checked)}
                     onDishClick={(recipeId) => setOpenRecipe(recipeId)}
                   />
                 </div>

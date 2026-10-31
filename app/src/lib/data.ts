@@ -442,6 +442,7 @@ export async function addPrepItem(args: {
   total_quantity?: string | null
   cut_style?: string | null
   order_index?: number
+  image_url?: string | null
 }) {
   const { error } = await supabase.from('prep_items').insert({
     session_id: args.session_id,
@@ -451,6 +452,7 @@ export async function addPrepItem(args: {
     cut_style: args.cut_style ?? null,
     order_index: args.order_index ?? 0,
     done: false,
+    image_url: args.image_url ?? null,
   })
   if (error) throw error
 }
@@ -488,6 +490,86 @@ export async function getShoppingItemsForWeek(weekId: string): Promise<ShoppingI
   return (data ?? []) as ShoppingItem[]
 }
 
+export type ShoppingSuggestion = {
+  name: string
+  category: string | null
+  image_url: string | null
+  is_pantry: boolean
+}
+
+// Distinct ingredient names from every week's shopping list, newest spelling
+// of each wins. Powers "+ Add ingredient" autocomplete so repeat items reuse
+// their image + category instead of being retyped.
+export async function getShoppingSuggestions(): Promise<ShoppingSuggestion[]> {
+  const { data } = await supabase
+    .from('shopping_items')
+    .select('name, category, image_url, is_pantry, created_at')
+    .order('created_at', { ascending: false })
+  const seen = new Map<string, ShoppingSuggestion>()
+  for (const r of (data ?? []) as Array<ShoppingSuggestion & { created_at: string }>) {
+    const key = r.name.trim().toLowerCase()
+    if (!seen.has(key)) {
+      seen.set(key, { name: r.name, category: r.category, image_url: r.image_url, is_pantry: r.is_pantry })
+    } else {
+      // If a later row has an image and the kept one doesn't, upgrade.
+      const kept = seen.get(key)!
+      if (!kept.image_url && r.image_url) seen.set(key, { ...kept, image_url: r.image_url })
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export type PrepSuggestion = {
+  ingredient_name: string
+  action: PrepAction
+  cut_style: string | null
+  total_quantity: string | null
+  image_url: string | null
+}
+
+// Distinct prep items from every past session, keyed by name + action + cut.
+// Powers Prep's "+ Add item" autocomplete so e.g. "chopped yellow onion,
+// finely diced" reuses its image + defaults.
+export async function getPrepSuggestions(): Promise<PrepSuggestion[]> {
+  const { data } = await supabase
+    .from('prep_items')
+    .select('ingredient_name, action, cut_style, total_quantity, image_url, created_at')
+    .order('created_at', { ascending: false })
+  const seen = new Map<string, PrepSuggestion>()
+  for (const r of (data ?? []) as Array<PrepSuggestion & { created_at: string }>) {
+    const key = `${r.ingredient_name.trim().toLowerCase()}|${r.action}|${(r.cut_style ?? '').trim().toLowerCase()}`
+    if (!seen.has(key)) {
+      seen.set(key, { ingredient_name: r.ingredient_name, action: r.action, cut_style: r.cut_style, total_quantity: r.total_quantity, image_url: r.image_url })
+    } else {
+      const kept = seen.get(key)!
+      if (!kept.image_url && r.image_url) seen.set(key, { ...kept, image_url: r.image_url })
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.ingredient_name.localeCompare(b.ingredient_name))
+}
+
+export async function addShoppingItem(args: {
+  week_id: string
+  name: string
+  category: string | null
+  quantity: string | null
+  unit?: string | null
+  is_pantry?: boolean
+  image_url?: string | null
+}) {
+  const { error } = await supabase.from('shopping_items').insert({
+    week_id: args.week_id,
+    name: args.name,
+    category: args.category,
+    quantity: args.quantity,
+    unit: args.unit ?? null,
+    have: false,
+    is_pantry: args.is_pantry ?? false,
+    image_url: args.image_url ?? null,
+  })
+  if (error) throw error
+}
+
 export async function updateShoppingItem(id: string, patch: Partial<Pick<ShoppingItem, 'have' | 'quantity'>>) {
   const { error } = await supabase.from('shopping_items').update(patch).eq('id', id)
   if (error) throw error
@@ -499,5 +581,25 @@ export async function clearSlotAteLog(dayDate: string, slot: MealPlanItem['slot'
     .eq('day_date', dayDate)
     .eq('slot', slot)
     .eq('item_name', '__slot__')
+  if (error) throw error
+}
+
+export async function clearItemAteLog(dayDate: string, slot: MealPlanItem['slot'], itemName: string) {
+  const { error } = await supabase.from('actual_eating_log')
+    .delete()
+    .eq('day_date', dayDate)
+    .eq('slot', slot)
+    .eq('item_name', itemName)
+  if (error) throw error
+}
+
+// Delete every meal_plan_item in a given (week, day, slot). Used by the
+// Day view's slot-level "Remove" affordance.
+export async function clearSlotItems(weekId: string, dayDate: string, slot: MealPlanItem['slot']) {
+  const { error } = await supabase.from('meal_plan_items')
+    .delete()
+    .eq('week_id', weekId)
+    .eq('day_date', dayDate)
+    .eq('slot', slot)
   if (error) throw error
 }

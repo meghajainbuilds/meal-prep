@@ -5,9 +5,9 @@ import IngredientCategory from '../components/IngredientCategory'
 import SignIn from '../components/SignIn'
 import DatePicker from '../components/DatePicker'
 import {
-  dayLong, dayNumber, getShoppingItemsForWeek, INGREDIENT_CATEGORIES,
-  mondayOf, monthShort, updateShoppingItem,
-  type ShoppingItem,
+  addShoppingItem, dayLong, dayNumber, getShoppingItemsForWeek, getShoppingSuggestions,
+  INGREDIENT_CATEGORIES, mondayOf, monthShort, updateShoppingItem,
+  type ShoppingItem, type ShoppingSuggestion,
 } from '../lib/data'
 
 type Filter = 'all' | 'check'
@@ -25,6 +25,33 @@ export default function Ingredients() {
   })
   const [error, setError] = useState<string | null>(null)
   const [pickerError, setPickerError] = useState<string | null>(null)
+  const [suggestions, setSuggestions] = useState<ShoppingSuggestion[]>([])
+  const [addOpen, setAddOpen] = useState(false)
+
+  useEffect(() => {
+    getShoppingSuggestions().then(setSuggestions).catch(() => { /* ignore */ })
+  }, [])
+
+  async function handleAdd(args: { name: string; category: string | null; quantity: string | null; isPantry: boolean; imageUrl: string | null }) {
+    if (!activeWeek) return
+    try {
+      await addShoppingItem({
+        week_id: activeWeek.id,
+        name: args.name,
+        category: args.category,
+        quantity: args.quantity,
+        is_pantry: args.isPantry,
+        image_url: args.imageUrl,
+      })
+      const fresh = await getShoppingItemsForWeek(activeWeek.id)
+      setItems(fresh)
+      setAddOpen(false)
+      // Refresh suggestions so the new item is available next time.
+      getShoppingSuggestions().then(setSuggestions)
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    }
+  }
 
   function onDateChange(iso: string) {
     const weekStart = mondayOf(iso)
@@ -141,10 +168,26 @@ export default function Ingredients() {
         </div>
 
         <div className="flex items-center gap-5 text-sm">
+          {canEdit && (
+            <button
+              onClick={() => setAddOpen((v) => !v)}
+              className="font-medium text-accent hover:underline"
+            >
+              {addOpen ? 'Cancel' : '+ Add ingredient'}
+            </button>
+          )}
           <button onClick={expandAll} className="text-ink hover:underline">Expand all</button>
           <button onClick={collapseAll} className="text-ink hover:underline">Collapse all</button>
         </div>
       </div>
+
+      {addOpen && (
+        <AddIngredientRow
+          suggestions={suggestions}
+          onCancel={() => setAddOpen(false)}
+          onAdd={handleAdd}
+        />
+      )}
 
       {!session && (
         <div className="rounded-xl border border-dashed border-border bg-surface/50 p-4 text-sm text-muted">
@@ -197,5 +240,100 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
     >
       {children}
     </button>
+  )
+}
+
+function AddIngredientRow({
+  suggestions, onCancel, onAdd,
+}: {
+  suggestions: ShoppingSuggestion[]
+  onCancel: () => void
+  onAdd: (args: { name: string; category: string | null; quantity: string | null; isPantry: boolean; imageUrl: string | null }) => void
+}) {
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState<string>('fresh')
+  const [quantity, setQuantity] = useState('')
+  const [isPantry, setIsPantry] = useState(false)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const listId = 'ingredient-suggest'
+
+  // When the typed name matches an existing ingredient, prefill its category
+  // and photo so repeat items reuse their image + bucket instead of being
+  // retyped. Owner can still edit before saving.
+  function onNameChange(next: string) {
+    setName(next)
+    const match = suggestions.find((s) => s.name.toLowerCase() === next.trim().toLowerCase())
+    if (match) {
+      setCategory(match.category ?? 'fresh')
+      setIsPantry(match.is_pantry)
+      setImageUrl(match.image_url)
+    } else {
+      setImageUrl(null)
+    }
+  }
+
+  function submit() {
+    if (!name.trim()) return
+    onAdd({
+      name: name.trim(),
+      category,
+      quantity: quantity.trim() || null,
+      isPantry,
+      imageUrl,
+    })
+    setName(''); setQuantity(''); setImageUrl(null)
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="grid grid-cols-[auto_1.5fr_1fr_1fr_auto_auto] items-center gap-3">
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-sage/40">
+          {imageUrl && (
+            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          )}
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="Ingredient name (start typing to pick existing)"
+          list={listId}
+          className="rounded-md border border-border bg-card px-2 py-1.5 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
+        />
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s.name} value={s.name} />
+          ))}
+        </datalist>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded-md border border-border bg-card px-2 py-1.5 text-sm text-ink focus:border-ink focus:outline-none"
+        >
+          {INGREDIENT_CATEGORIES.map((c) => (
+            <option key={c.key} value={c.key}>{c.label}</option>
+          ))}
+        </select>
+        <input
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          placeholder="quantity (optional)"
+          className="rounded-md border border-border bg-card px-2 py-1.5 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
+        />
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input
+            type="checkbox"
+            checked={isPantry}
+            onChange={(e) => setIsPantry(e.target.checked)}
+            className="h-4 w-4 accent-ink"
+          />
+          Pantry
+        </label>
+        <div className="flex gap-2">
+          <button onClick={submit} disabled={!name.trim()} className="rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-surface disabled:opacity-40">Add</button>
+          <button onClick={onCancel} className="text-xs text-muted hover:text-ink">Cancel</button>
+        </div>
+      </div>
+    </div>
   )
 }

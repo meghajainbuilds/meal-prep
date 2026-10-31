@@ -4,10 +4,10 @@ import type { AppContext } from '../App'
 import SignIn from '../components/SignIn'
 import DatePicker from '../components/DatePicker'
 import {
-  addPrepItem, dayNumber, deletePrepItem, getPrepSessionsForWeek,
+  addPrepItem, dayNumber, deletePrepItem, getPrepSessionsForWeek, getPrepSuggestions,
   mondayOf, monthShort, PREP_ACTIONS,
   updatePrepItem, updatePrepSessionNotes,
-  type PrepAction, type PrepItem, type PrepSession,
+  type PrepAction, type PrepItem, type PrepSession, type PrepSuggestion,
 } from '../lib/data'
 
 export default function Prep() {
@@ -31,6 +31,11 @@ export default function Prep() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [suggestions, setSuggestions] = useState<PrepSuggestion[]>([])
+
+  useEffect(() => {
+    getPrepSuggestions().then(setSuggestions).catch(() => { /* ignore */ })
+  }, [])
 
   const refresh = useCallback(async () => {
     if (!activeWeek) return
@@ -58,8 +63,8 @@ export default function Prep() {
   const handleRemove = wrap(async (id: string) => deletePrepItem(id))
   const handleMove = wrap(async (id: string, newSessionId: string) => updatePrepItem(id, { session_id: newSessionId }))
   const handleEdit = wrap(async (id: string, patch: Partial<Pick<PrepItem, 'ingredient_name' | 'total_quantity' | 'cut_style'>>) => updatePrepItem(id, patch))
-  const handleAdd = wrap(async (sessionId: string, action: PrepAction, ingredient_name: string, total_quantity: string | null, cut_style: string | null, nextOrder: number) =>
-    addPrepItem({ session_id: sessionId, action, ingredient_name, total_quantity, cut_style, order_index: nextOrder }))
+  const handleAdd = wrap(async (sessionId: string, action: PrepAction, ingredient_name: string, total_quantity: string | null, cut_style: string | null, nextOrder: number, image_url: string | null) =>
+    addPrepItem({ session_id: sessionId, action, ingredient_name, total_quantity, cut_style, order_index: nextOrder, image_url }))
   const handleNotes = wrap(async (id: string, text: string) => updatePrepSessionNotes(id, text))
 
   if (!activeWeek) {
@@ -155,6 +160,7 @@ export default function Prep() {
               onEdit={handleEdit}
               onAdd={handleAdd}
               onNotes={handleNotes}
+              suggestions={suggestions}
             />
           )}
         </>
@@ -172,12 +178,13 @@ type SessionBodyProps = {
   onRemove: (id: string) => void
   onMove: (id: string, newSessionId: string) => void
   onEdit: (id: string, patch: Partial<Pick<PrepItem, 'ingredient_name' | 'total_quantity' | 'cut_style'>>) => void
-  onAdd: (sessionId: string, action: PrepAction, name: string, quantity: string | null, cut: string | null, nextOrder: number) => void
+  onAdd: (sessionId: string, action: PrepAction, name: string, quantity: string | null, cut: string | null, nextOrder: number, image_url: string | null) => void
   onNotes: (id: string, text: string) => void
+  suggestions: PrepSuggestion[]
 }
 
 function SessionBody(props: SessionBodyProps) {
-  const { session, canEdit, moveTargetId, moveTargetNumber, onToggleDone, onRemove, onMove, onEdit, onAdd, onNotes } = props
+  const { session, canEdit, moveTargetId, moveTargetNumber, onToggleDone, onRemove, onMove, onEdit, onAdd, onNotes, suggestions } = props
   const [notesDraft, setNotesDraft] = useState(session.notes ?? '')
   const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -212,6 +219,7 @@ function SessionBody(props: SessionBodyProps) {
             onMove={onMove}
             onEdit={onEdit}
             onAdd={onAdd}
+            suggestions={suggestions}
           />
         ))}
       </div>
@@ -272,6 +280,7 @@ type GroupProps = {
   onMove: SessionBodyProps['onMove']
   onEdit: SessionBodyProps['onEdit']
   onAdd: SessionBodyProps['onAdd']
+  suggestions: PrepSuggestion[]
 }
 
 function PrepGroup(p: GroupProps) {
@@ -298,9 +307,11 @@ function PrepGroup(p: GroupProps) {
 
       {addOpen && (
         <AddItemRow
+          action={p.action}
+          suggestions={p.suggestions}
           onCancel={() => setAddOpen(false)}
-          onAdd={(name, qty, cut) => {
-            p.onAdd(p.sessionId, p.action, name, qty, cut, p.items.length)
+          onAdd={(name, qty, cut, imageUrl) => {
+            p.onAdd(p.sessionId, p.action, name, qty, cut, p.items.length, imageUrl)
             setAddOpen(false)
           }}
         />
@@ -452,20 +463,67 @@ function DoneBox({ checked, onChange, disabled }: { checked: boolean; onChange: 
   )
 }
 
-function AddItemRow({ onCancel, onAdd }: { onCancel: () => void; onAdd: (name: string, qty: string | null, cut: string | null) => void }) {
+function AddItemRow({
+  action, suggestions, onCancel, onAdd,
+}: {
+  action: PrepAction
+  suggestions: PrepSuggestion[]
+  onCancel: () => void
+  onAdd: (name: string, qty: string | null, cut: string | null, image_url: string | null) => void
+}) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   const [cut, setCut] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+
+  // Suggestions scoped to this group's action, since the catalog is keyed by
+  // (ingredient, action, cut) — chopped onion is a different image from
+  // roasted onion.
+  const scoped = suggestions.filter((s) => s.action === action)
+  const listId = `prep-suggest-${action}`
+
+  // When the typed name matches a known suggestion, prefill cut + qty + image.
+  // Owner can still edit any of them before saving.
+  function onNameChange(next: string) {
+    setName(next)
+    const match = scoped.find((s) => s.ingredient_name.toLowerCase() === next.trim().toLowerCase())
+    if (match) {
+      if (!cut && match.cut_style) setCut(match.cut_style)
+      if (!qty && match.total_quantity) setQty(match.total_quantity)
+      setImageUrl(match.image_url)
+    } else {
+      setImageUrl(null)
+    }
+  }
 
   function submit() {
     if (!name.trim()) return
-    onAdd(name.trim(), qty.trim() || null, cut.trim() || null)
-    setName(''); setQty(''); setCut('')
+    onAdd(name.trim(), qty.trim() || null, cut.trim() || null, imageUrl)
+    setName(''); setQty(''); setCut(''); setImageUrl(null)
   }
 
   return (
-    <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-3 border-b border-border bg-surface/40 px-5 py-3">
-      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ingredient" className="rounded-md border border-border bg-card px-2 py-1 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none" />
+    <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] items-center gap-3 border-b border-border bg-surface/40 px-5 py-3">
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-sage/40">
+        {imageUrl && (
+          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        )}
+      </div>
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder="Ingredient (start typing to pick existing)"
+        list={listId}
+        className="rounded-md border border-border bg-card px-2 py-1 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
+      />
+      <datalist id={listId}>
+        {scoped.map((s) => (
+          <option key={`${s.ingredient_name}-${s.cut_style ?? ''}`} value={s.ingredient_name}>
+            {s.cut_style ? `${s.cut_style}` : ''}{s.total_quantity ? ` · ${s.total_quantity}` : ''}
+          </option>
+        ))}
+      </datalist>
       <input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="quantity (optional)" className="rounded-md border border-border bg-card px-2 py-1 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none" />
       <input value={cut} onChange={(e) => setCut(e.target.value)} placeholder="cut / style (optional)" className="rounded-md border border-border bg-card px-2 py-1 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none" />
       <div className="flex gap-2">

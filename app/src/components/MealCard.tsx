@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import DishChip from './DishChip'
 import type { ActualEatingLog, AteStatus, MealPlanItem } from '../lib/data'
 
 type Props = {
@@ -8,17 +7,27 @@ type Props = {
   slotTime: string
   items: MealPlanItem[]
   canEdit: boolean
-  ate: ActualEatingLog | null
+  ate: ActualEatingLog | null                       // slot-level ate log
+  ateByItemId: Map<string, ActualEatingLog>          // per-item ate logs, keyed by meal_plan_item.id
   onAddDish: () => void
-  onRemoveItem: (id: string) => void
+  onRemoveSlot: () => void
   onEditPlateNote: (plateText: string) => void
   onAteChange: (status: AteStatus | null, notes: string | null) => void
+  onItemAteChange: (itemId: string, checked: boolean) => void
   onDishClick?: (recipeId: string) => void
+}
+
+function slotTitle(slotLabel: string, items: MealPlanItem[]): string {
+  if (items.length === 0) return `No ${slotLabel.toLowerCase()} planned`
+  const names = items.map((i) => i.display_name ?? i.recipe?.name ?? 'Untitled')
+  if (names.length === 1) return names[0]
+  return `${names[0]} + ${names[1]}`
 }
 
 export default function MealCard({
   slotLabel, slotTime, items, canEdit,
-  ate, onAddDish, onRemoveItem, onEditPlateNote, onAteChange, onDishClick,
+  ate, ateByItemId, onAddDish, onRemoveSlot, onEditPlateNote, onAteChange,
+  onItemAteChange, onDishClick,
 }: Props) {
   const firstItem = items[0]
   const [plateText, setPlateText] = useState(firstItem?.custom_notes ?? '')
@@ -45,139 +54,175 @@ export default function MealCard({
     noteTimer.current = setTimeout(() => onAteChange(ate?.status ?? 'other', next), 500)
   }
 
-  const status = ate?.status ?? null
+  const slotStatus = ate?.status ?? null
   const isEmpty = items.length === 0
+  const title = slotTitle(slotLabel, items)
+
+  async function removeWithConfirm() {
+    if (isEmpty) return
+    if (window.confirm(`Remove all dishes from ${slotLabel.toLowerCase()}?`)) {
+      onRemoveSlot()
+    }
+  }
 
   return (
-    <div className="relative rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <div className="meta text-muted" style={{ letterSpacing: '0.14em' }}>{slotTime}</div>
-          <h3 className="mt-1 font-display text-2xl font-normal text-ink">{slotLabel}</h3>
-        </div>
-        <div className="text-right text-xs uppercase tracking-wider text-muted-soft">
-          {items.length === 0 ? 'Empty' : `${items.length} ${items.length === 1 ? 'dish' : 'dishes'}`}
-        </div>
-      </div>
+    <div className={`rounded-2xl border border-border p-6 shadow-sm ${isEmpty ? 'bg-sage/30' : 'bg-card'}`}>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
 
-      <div className="mt-5 grid gap-6 md:grid-cols-[1fr_1fr]">
+        {/* LEFT: slot header + MY PLATE + controls */}
+        <div className="min-w-0">
+          <div className="meta mb-2 text-muted" style={{ letterSpacing: '0.14em' }}>
+            {slotTime.toUpperCase()} · {slotLabel.toUpperCase()} · PLANNED
+          </div>
+          <h3 className="font-display text-2xl font-normal leading-tight text-ink md:text-3xl">
+            {title}
+          </h3>
+
+          <div className="mt-5 rounded-xl bg-sage/50 p-4">
+            <div className="meta mb-2 text-ink/70" style={{ letterSpacing: '0.14em' }}>MY PLATE · ONE ADULT</div>
+            {canEdit && !isEmpty ? (
+              <textarea
+                value={plateText}
+                onChange={(e) => debouncePlate(e.target.value)}
+                placeholder="e.g. half plate greens, 1 cup rice, 1 roti"
+                className="w-full resize-none bg-transparent text-sm text-ink placeholder:text-muted-soft focus:outline-none"
+                rows={3}
+              />
+            ) : (
+              <p className="text-sm text-ink/80">
+                {plateText || <span className="italic text-muted-soft">—</span>}
+              </p>
+            )}
+          </div>
+
+          {canEdit && (
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+              <button
+                onClick={onAddDish}
+                className="font-medium text-ink underline-offset-4 hover:underline"
+              >
+                Edit planned meal
+              </button>
+              {!isEmpty && (
+                <button
+                  onClick={removeWithConfirm}
+                  className="font-medium text-ink underline-offset-4 hover:underline hover:text-accent"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: dish photo cards */}
         <div>
           {isEmpty ? (
-            <p className="text-sm italic text-muted-soft">No dishes planned.</p>
+            <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-card/50 p-8 text-sm italic text-muted-soft">
+              {canEdit ? 'Add dishes to plan this slot.' : 'No dishes planned.'}
+            </div>
           ) : (
-            <ul className="space-y-3">
-              {items.map((item) => (
-                <li key={item.id} className="group flex items-center justify-between gap-3">
-                  <DishChip
-                    name={item.display_name ?? item.recipe?.name ?? 'Untitled'}
-                    imageUrl={item.recipe?.image_url}
-                    size="md"
-                    onClick={item.recipe_id && onDishClick ? () => onDishClick(item.recipe_id!) : undefined}
-                  />
-                  {canEdit && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((item) => {
+                const name = item.display_name ?? item.recipe?.name ?? 'Untitled'
+                const checked = !!ateByItemId.get(item.id)
+                const clickable = item.recipe_id && onDishClick
+                return (
+                  <div key={item.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
                     <button
-                      onClick={() => onRemoveItem(item.id)}
-                      className="opacity-0 transition group-hover:opacity-100 text-xs text-muted hover:text-accent"
-                      aria-label={`Remove ${item.display_name ?? item.recipe?.name}`}
+                      type="button"
+                      onClick={clickable ? () => onDishClick!(item.recipe_id!) : undefined}
+                      disabled={!clickable}
+                      className={`relative block aspect-square w-full ${clickable ? 'cursor-pointer hover:opacity-95' : 'cursor-default'}`}
+                      aria-label={clickable ? `Open recipe for ${name}` : name}
                     >
-                      Remove
+                      {item.recipe?.image_url ? (
+                        <img
+                          src={item.recipe.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-sage/60 text-4xl font-display text-ink/40">
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canEdit && (
-            <button
-              onClick={onAddDish}
-              className="mt-4 text-sm font-medium text-accent hover:underline"
-            >
-              + Add dish
-            </button>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-sage-strong/60 bg-sage/50 p-4">
-          <div className="meta mb-2 text-ink/70" style={{ letterSpacing: '0.14em' }}>My plate</div>
-          {canEdit ? (
-            <textarea
-              value={plateText}
-              onChange={(e) => debouncePlate(e.target.value)}
-              placeholder="e.g. half plate greens, 1 cup rice, 1 roti"
-              className="w-full resize-none rounded-md border border-border/60 bg-card/80 p-2 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
-              rows={3}
-              disabled={isEmpty}
-            />
-          ) : (
-            <p className="text-sm text-ink/80">
-              {plateText || <span className="italic text-muted-soft">—</span>}
-            </p>
+                    <div className="flex flex-1 flex-col justify-between gap-2 p-3">
+                      <p className="text-sm text-ink">{name}</p>
+                      {canEdit && (
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => onItemAteChange(item.id, e.target.checked)}
+                            className="h-4 w-4 rounded border-border accent-ink"
+                          />
+                          <span className="font-semibold">Ate it</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
 
-      {canEdit && (
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          <AteButton
-            label="Ate the whole meal"
-            active={status === 'as_planned'}
-            tone="ink"
-            onClick={() => {
-              if (status === 'as_planned') onAteChange(null, null)
-              else onAteChange('as_planned', null)
-            }}
-          />
-          <AteButton
-            label="Ate something else"
-            active={status === 'other' || status === 'substituted'}
-            tone="accent"
-            onClick={() => {
-              if (status === 'other' || status === 'substituted') {
-                setShowNote(false)
-                onAteChange(null, null)
-              } else {
-                setShowNote(true)
-                onAteChange('other', noteDraft || null)
-              }
-            }}
-          />
-          {status && (
+      {/* BOTTOM: slot-level ate section */}
+      {canEdit && !isEmpty && (
+        <div className="mt-6 border-t border-border pt-4">
+          <div className="flex flex-wrap items-center gap-5 text-sm">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={slotStatus === 'as_planned'}
+                onChange={(e) => {
+                  if (e.target.checked) onAteChange('as_planned', null)
+                  else onAteChange(null, null)
+                }}
+                className="h-4 w-4 rounded border-border accent-ink"
+              />
+              <span className="font-semibold text-ink">Ate the whole meal</span>
+            </label>
+            <button
+              onClick={() => {
+                if (slotStatus === 'other' || slotStatus === 'substituted') {
+                  setShowNote(false)
+                  onAteChange(null, null)
+                } else {
+                  setShowNote(true)
+                  onAteChange('other', noteDraft || null)
+                }
+              }}
+              className={`underline-offset-4 hover:underline ${
+                slotStatus === 'other' || slotStatus === 'substituted' ? 'text-accent font-semibold' : 'text-ink'
+              }`}
+            >
+              Ate something else
+            </button>
             <button
               onClick={() => setShowNote((s) => !s)}
-              className="ml-auto text-xs text-muted hover:text-ink"
+              className="text-ink underline-offset-4 hover:underline"
             >
-              {showNote ? 'Hide note' : 'Check what you ate'}
+              {showNote ? 'Hide what you ate' : 'Check what you ate'}
             </button>
-          )}
-        </div>
-      )}
+          </div>
 
-      {canEdit && showNote && (
-        <div className="mt-3">
-          <textarea
-            value={noteDraft}
-            onChange={(e) => debounceNote(e.target.value)}
-            placeholder={status === 'as_planned' ? 'Optional notes…' : 'What did you eat instead?'}
-            className="w-full resize-none rounded-md border border-border bg-card p-2 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
-            rows={2}
-          />
+          {showNote && (
+            <div className="mt-3">
+              <textarea
+                value={noteDraft}
+                onChange={(e) => debounceNote(e.target.value)}
+                placeholder={slotStatus === 'as_planned' ? 'Optional notes…' : 'What did you eat instead?'}
+                className="w-full resize-none rounded-md border border-border bg-card p-2 text-sm text-ink placeholder:text-muted-soft focus:border-ink focus:outline-none"
+                rows={2}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
-  )
-}
-
-function AteButton({
-  label, active, tone, onClick,
-}: { label: string; active: boolean; tone: 'ink' | 'accent'; onClick: () => void }) {
-  const base = 'rounded-full border px-4 py-1.5 text-xs font-medium transition'
-  const activeCls = tone === 'ink'
-    ? 'border-ink bg-ink text-surface'
-    : 'border-accent bg-accent text-surface'
-  const idle = 'border-border bg-card text-muted hover:border-muted-soft hover:text-ink'
-  return (
-    <button onClick={onClick} className={`${base} ${active ? activeCls : idle}`}>
-      {label}
-    </button>
   )
 }
