@@ -21,7 +21,7 @@
 - [x] Day view (`views/Day.tsx`): 7-day pill selector, 5-slot timeline with time rail + dots, per-slot `MealCard` (dishes + MY PLATE sage box + ate-it toggle + "+ Add dish"), day toolbar ("+ Add planned meal", "Apply a sample menu"), `PlannedEstimate` sidebar (counts + tag composition + per-slot summary; no fake calories). AddDishModal (recipe search + custom), SampleMenuPicker (3 templates, wipes + rewrites one day).
 - [x] Ingredients view (`views/Ingredients.tsx`): 3 collapsible categories (Fresh / Pantry / Alternatives) with "All ingredients" vs "Check / buy only" filter, "N marked Have · M to check" counter (excludes Alternatives), Expand/Collapse all, Print list, per-row image + name + editable quantity + Have checkbox + USED IN chips. Writes to `shopping_items`.
 - [x] Prep view (`views/Prep.tsx`): session tabs (Sunday prep + Wednesday refresh) with completion counts, 3 numbered groups per session (Chop/Roast/Cook), per-row done checkbox + inline Edit + Move-to-other-session + Remove, "+ Add item" per group, right-rail Session notes textarea + per-group progress. Writes to `prep_items` (added `done boolean`) and `prep_sessions`.
-- [~] Dish & ingredient photography: pipeline built, not yet run. `jobs/jobs/generate-images.mjs` calls OpenAI `gpt-image-1` (defaults: medium quality, 1024x1024), uploads to Supabase Storage bucket `food-images` at `{kind}/{id}.png`, writes `publicUrl` back to `recipes.image_url` / `shopping_items.image_url` / `prep_items.image_url`. Flags: `--limit N` (default 5), `--only recipes|shopping|prep`, `--all` (regenerate all). Recipes view already renders `image_url` when present; still null everywhere until the job runs. Needs `OPENAI_API_KEY` in `.env`.
+- [x] Dish & ingredient photography: `jobs/jobs/generate-images.mjs` calls OpenAI `gpt-image-2` (defaults: low quality, 1024x1024), uploads to Supabase Storage bucket `food-images` at `{kind}/{id}.png`, writes `publicUrl` back to `recipes.image_url` / `shopping_items.image_url` / `prep_items.image_url`. Flags: `--limit N` (default 5), `--only recipes|shopping|prep`, `--all` (regenerate all). Dedupes by name across weeks (shopping) and by (ingredient, action, cut_style) across sessions (prep), so repeated items reuse existing images without regenerating. All existing seed data (99 items) generated 2026-10-30 at low quality.
 - Seed: `cd jobs && node run.mjs seed-week-1` → recipes + meal plan. `node run.mjs seed-shopping-1` → 56 shopping_items for Oct 26. `node run.mjs seed-prep-1` → 2 prep_sessions + 24 prep_items for Oct 26.
 
 ## Auth
@@ -60,6 +60,8 @@
 - 2026-10-30: getLatestWeek() fixed to skip empty weeks (previously returned the Friday-stub 2026-11-02 week with 0 items, making Week view blank).
 - 2026-10-30: Ingredients view v1 shipped — 3 collapsible categories, filter toggle, Have/quantity edit, USED IN chips. 56 shopping_items seeded for Oct 26 week via `seed-shopping-1`.
 - 2026-10-30: Prep view v1 shipped — session tabs with done counts, Chop/Roast/Cook groups, inline edit, Move-to-session, Remove, Add item, session notes textarea. Added `prep_items.done boolean` via Management API migration. 2 sessions + 24 items seeded via `seed-prep-1`.
+- 2026-10-30: Image gen pipeline shipped and run — 99/99 images generated via OpenAI `gpt-image-2` quality=low (19 recipes + 56 shopping + 24 prep). Stored in Supabase Storage bucket `food-images`, URLs written to each row's `image_url`. Deduplication by name across weeks (shopping) and by (name, action, cut_style) (prep) so repeated items reuse existing images for free. Views already read `image_url` with initial-letter fallback.
+- 2026-10-30: Security hardening deployed — new `is_owner()` SQL function matches JWT email; writes on planned-content tables (recipes, weeks, meal_plan_items, shopping_items, prep_sessions, prep_items) now require `is_owner()` (previously any authenticated user). `/api/ai` now 401s unless Bearer JWT email matches owner. `actual_eating_log` reads opened to public (writes still owner-only) so visitors see full demo experience. App shows a sage read-only banner to signed-in non-owners pointing at the GitHub repo.
 
 ## Admin URLs
 - Live app: https://meal-prep-megha.netlify.app
@@ -70,12 +72,12 @@
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site
 
 ## Next-session queue (in order)
-1. Run image pipeline — set `OPENAI_API_KEY` in `.env`, then `cd jobs && node run.mjs generate-images -- --limit 2 --only recipes` to smoke test, then `node run.mjs generate-images -- --limit 200` for full pass (~140 images). Rebuild + deploy app to ship the Recipes hero image.
-2. Recipes view polish — category chip filters, favorites heart, search, "Recipe & source" link.
-3. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam.
-4. Ingredients polish — "+ Add ingredient" button; drag-sort within a category; print-only stylesheet.
-5. Prep polish — reorder within a group (drag or up/down), per-item image swap-in once image gen runs, maybe timers.
-6. Real logic for generate-week + monday-upkeep (currently stubs).
+1. Recipes view polish — category chip filters, favorites heart, search, "Recipe & source" link.
+2. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam.
+3. Ingredients polish — "+ Add ingredient" button; drag-sort within a category; print-only stylesheet.
+4. Prep polish — reorder within a group (drag or up/down), maybe timers.
+5. Real logic for generate-week + monday-upkeep (currently stubs).
+6. Owner-aware UI gating — hide/disable write buttons for non-owner visitors (currently they can still click; writes just fail silently via RLS).
 
 ## Known gotchas (don't re-discover)
 - Netlify: Team Access Controls / Visitor access can block public reads. Must be "Public" at both team and site level.
