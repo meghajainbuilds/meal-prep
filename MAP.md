@@ -66,6 +66,8 @@
 - 2026-10-31: Week picker + date-based navigation shipped — URL `?week=<id>` + `?date=<yyyy-mm-dd>`; getLatestWeek now defaults to the newest past-or-current week (future-dated Nov 2 no longer preempts current Oct 26). Native `<input type="date">` DatePicker with prev/next arrows in Week/Day/Ingredients/Prep views, 1-day step on Day, 7-day step elsewhere. Version numbers removed from all UI. Week header switched to "Week of Mon, Oct 26, 2026." format.
 - 2026-10-31: Day view redesign + Prep/Ingredients autocomplete shipped — MealCard rebuilt to match owner's screenshot: dish photo cards in a 2-col right grid, per-item "Ate it" checkbox under each photo, slot-level "Ate the whole meal / Ate something else / Check what you ate" row at the bottom, Edit planned meal / Remove inline link row, MY PLATE sage box with slot title derived from first two dishes. Per-item ate logs now stored in `actual_eating_log` keyed by `item_name = meal_plan_item.id`. Prep "+ Add item" and Ingredients new "+ Add ingredient" affordances use HTML `<datalist>` autocomplete sourced from `getPrepSuggestions()` / `getShoppingSuggestions()` (distinct across all weeks), prefill cut_style/qty/category and reuse existing `image_url` so repeat items don't retype.
 - 2026-10-31: Recipe content filled in via Claude. New `recipes.is_plate_component boolean` column; 5 items marked (Rice, Whole-wheat roti, Simple lunch vegetables, Greek yogurt, Daily soaked seed mix) so they stay available in menus but drop out of the Recipes grid. New `jobs/jobs/enrich-recipes.mjs` loads the requirements doc as system prompt and asks Claude for structured JSON {ingredients[], method, source_chef, adaptations, sesame_safe} per recipe; max_tokens 2500 after a first-pass truncation. All 16 real recipes now have 6-15 ingredients, 5-6 method steps, source attribution where known (Nobu for miso salmon, etc.), household adaptations noted, sesame-free explicitly enforced in both ingredients and method. Recipes grid now opens the RecipeModal on card click. Content shows across all three views where RecipeModal is wired (Week, Day, Recipes).
+- 2026-10-31: Repo made public at https://github.com/meghajainbuilds/meal-prep. Secret scan on both tracked files and full git history came up empty (only `.env.example` with blank values matched). Visitor Fork-the-repo banner now links to a real URL.
+- 2026-11-02: Recipes grid: dynamic filter tabs + search. Tabs are "All" (always first), "Favorites" (only when any favorited recipe exists, with count badge), then one tab per unique `recipes.tags[0]` alphabetically with counts. Search box filters by name + description (case-insensitive). Favorited recipes get a terracotta heart badge in the card corner. Empty-filter state message distinguishes "no matches" from "no recipes".
 
 ## Admin URLs
 - Live app: https://meal-prep-megha.netlify.app
@@ -76,13 +78,12 @@
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site
 
 ## Next-session queue (in order)
-1. **Recipes filter tabs + search** — Favorites / Protein+legumes / Vegetables / Rice / Roots & starches / Prep bases / Alternatives tabs at top + free-text search box. Categories already live in `recipes.tags[0]`.
-2. **Recipe modal edit flow** — "Edit my version" button → form with name/picture/ingredients/method/adaptation; saves updates back to `recipes` row. Owner never uploads photos; keep current image or regenerate on next image-gen pass.
-3. **Favorites system** — heart button in RecipeModal toggles `recipes.is_favorite`; "Why it works" text input updates `recipes.favorite_reason`. (Columns already exist.)
-4. **"+ Add my own recipe"** — new modal (reuses the Edit form in create mode) that inserts a `recipes` row. New rows don't have `image_url` yet — the next `node run.mjs generate-images` run picks them up because the job skips rows that already have one.
-5. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam; derive slot title ("Sprouts + soy eggs") now that plate components are flagged.
-6. Monday-upkeep real logic (`jobs/jobs/monday-upkeep.mjs` is still a stub).
-7. Owner-aware UI gating — hide/disable write buttons for non-owner visitors (writes already fail server-side via RLS; UI just doesn't hide them yet).
+1. **Favorites system** — heart button in RecipeModal toggles `recipes.is_favorite`; "Why it works" text input updates `recipes.favorite_reason`. Columns already exist, and the Recipes grid already decorates favorited cards with a heart + has a Favorites tab that appears when any favorite exists.
+2. **Recipe modal edit flow** — "Edit my version" button → form with name/ingredients/method/adaptation; saves updates back to `recipes` row. Owner never uploads photos; keep current image or regenerate on next image-gen pass.
+3. **"+ Add my own recipe"** — new modal (reuses the Edit form in create mode) that inserts a `recipes` row. New rows don't have `image_url` yet — the next `node run.mjs generate-images` run picks them up because the job skips rows that already have one.
+4. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam; derive slot title ("Sprouts + soy eggs") now that plate components are flagged.
+5. Monday-upkeep real logic (`jobs/jobs/monday-upkeep.mjs` is still a stub).
+6. Owner-aware UI gating — hide/disable write buttons for non-owner visitors (writes already fail server-side via RLS; UI just doesn't hide them yet).
 
 ## Known gotchas (don't re-discover)
 - Netlify: Team Access Controls / Visitor access can block public reads. Must be "Public" at both team and site level.
