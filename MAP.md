@@ -2,7 +2,7 @@
 
 **What it is:** Single-user meal-planning web app for Megha. Weekly plan (Mon-Sun, Seattle time) with ingredients, prep sessions, recipe library, and actual-eating logs. Owner-only edit; public read-only view of planned content (no personal/private data).
 **Shape:** Agent with a dashboard
-**Agent:** claude   **Updated:** 2026-10-30
+**Agent:** claude   **Updated:** 2026-11-02
 
 ## Blocks
 - [x] foundation: https://github.com/meghajainbuilds/meal-prep , https://moajmtdzkcxabmkqflzf.supabase.co
@@ -23,6 +23,7 @@
 - [x] Prep view (`views/Prep.tsx`): session tabs (Sunday prep + Wednesday refresh) with completion counts, 3 numbered groups per session (Chop/Roast/Cook), per-row done checkbox + inline Edit + Move-to-other-session + Remove, "+ Add item" per group, right-rail Session notes textarea + per-group progress. Writes to `prep_items` (added `done boolean`) and `prep_sessions`.
 - [x] Dish & ingredient photography: `jobs/jobs/generate-images.mjs` calls OpenAI `gpt-image-2` (defaults: low quality, 1024x1024), uploads to Supabase Storage bucket `food-images` at `{kind}/{id}.png`, writes `publicUrl` back to `recipes.image_url` / `shopping_items.image_url` / `prep_items.image_url`. Flags: `--limit N` (default 5), `--only recipes|shopping|prep`, `--all` (regenerate all). Dedupes by name across weeks (shopping) and by (ingredient, action, cut_style) across sessions (prep), so repeated items reuse existing images without regenerating. All existing seed data (99 items) generated 2026-10-30 at low quality.
 - Seed: `cd jobs && node run.mjs seed-week-1` → recipes + meal plan. `node run.mjs seed-shopping-1` → 56 shopping_items for Oct 26. `node run.mjs seed-prep-1` → 2 prep_sessions + 24 prep_items for Oct 26.
+- Shopping + prep fill: `jobs/jobs/fill-shopping-prep.mjs` reads an existing week's menu + recipe ingredients and asks Claude for a consolidated shopping list (fresh/pantry/alternatives) + two prep sessions (Sunday + Wednesday). Reuses `image_url` from prior weeks' shopping/prep rows by name (and by name+action+cut for prep). Auto-picks the newest week needing fill, or honors `WEEK_ID=...`. `generate-week.mjs` now calls it at the end so new weekly runs produce complete weeks.
 
 ## Auth
 - Supabase email magic link (not Google). Owner: meghajain@outlook.com. Can swap to Google later.
@@ -68,6 +69,8 @@
 - 2026-10-31: Recipe content filled in via Claude. New `recipes.is_plate_component boolean` column; 5 items marked (Rice, Whole-wheat roti, Simple lunch vegetables, Greek yogurt, Daily soaked seed mix) so they stay available in menus but drop out of the Recipes grid. New `jobs/jobs/enrich-recipes.mjs` loads the requirements doc as system prompt and asks Claude for structured JSON {ingredients[], method, source_chef, adaptations, sesame_safe} per recipe; max_tokens 2500 after a first-pass truncation. All 16 real recipes now have 6-15 ingredients, 5-6 method steps, source attribution where known (Nobu for miso salmon, etc.), household adaptations noted, sesame-free explicitly enforced in both ingredients and method. Recipes grid now opens the RecipeModal on card click. Content shows across all three views where RecipeModal is wired (Week, Day, Recipes).
 - 2026-10-31: Repo made public at https://github.com/meghajainbuilds/meal-prep. Secret scan on both tracked files and full git history came up empty (only `.env.example` with blank values matched). Visitor Fork-the-repo banner now links to a real URL.
 - 2026-11-02: Recipes grid: dynamic filter tabs + search. Tabs are "All" (always first), "Favorites" (only when any favorited recipe exists, with count badge), then one tab per unique `recipes.tags[0]` alphabetically with counts. Search box filters by name + description (case-insensitive). Favorited recipes get a terracotta heart badge in the card corner. Empty-filter state message distinguishes "no matches" from "no recipes".
+- 2026-11-02: Ingredients + Prep tabs were empty on today's active week (2026-11-02 v2) because `generate-week.mjs` only wrote `meal_plan_items`. New `jobs/jobs/fill-shopping-prep.mjs` shipped: reads the week's menu + recipe ingredients and asks Claude for a consolidated shopping list (fresh/pantry/alternatives) + two prep sessions, dedupes images from prior weeks, inserts rows. `generate-week.mjs` now calls it after the menu insert so future Friday runs produce complete weeks. Backfilled 2026-11-02 (70 shopping_items + 2 prep_sessions + 21 prep_items).
+- 2026-11-02: Owner-aware UI gating shipped. `canEdit` is now computed in `App.tsx` as `session.user.email === OWNER_EMAIL` and threaded through `AppContext` to all views (Day, Ingredients, Prep, Recipes) and down to `RecipeModal`. Visitors (signed-out OR signed-in-non-owner) no longer see "+ Add planned meal", "Apply a sample menu", "+ Add ingredient", "+ Add item", Edit / Remove / Move links, Have/Done checkboxes, "Ate it" controls, plate-note editing, session notes editing, or the dead favorite-toggle button. The "Signed-out view. Sign in to edit…" nag boxes under Day/Ingredients/Prep are removed. The red "Read only · Fork the repo →" banner for signed-in visitors stays. Writes already fail server-side via RLS; this fix removes dead-end clicks so the app is safe to link from a public blog post.
 
 ## Admin URLs
 - Live app: https://meal-prep-megha.netlify.app
@@ -78,12 +81,11 @@
 - Visual + functional reference: https://one-week-kitchen-sample.misty-map-0388.chatgpt.site
 
 ## Next-session queue (in order)
-1. **Favorites system** — heart button in RecipeModal toggles `recipes.is_favorite`; "Why it works" text input updates `recipes.favorite_reason`. Columns already exist, and the Recipes grid already decorates favorited cards with a heart + has a Favorites tab that appears when any favorite exists.
-2. **Recipe modal edit flow** — "Edit my version" button → form with name/ingredients/method/adaptation; saves updates back to `recipes` row. Owner never uploads photos; keep current image or regenerate on next image-gen pass.
-3. **"+ Add my own recipe"** — new modal (reuses the Edit form in create mode) that inserts a `recipes` row. New rows don't have `image_url` yet — the next `node run.mjs generate-images` run picks them up because the job skips rows that already have one.
-4. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam; derive slot title ("Sprouts + soy eggs") now that plate components are flagged.
-5. Monday-upkeep real logic (`jobs/jobs/monday-upkeep.mjs` is still a stub).
-6. Owner-aware UI gating — hide/disable write buttons for non-owner visitors (writes already fail server-side via RLS; UI just doesn't hide them yet).
+1. **Monday-upkeep real logic** — `jobs/jobs/monday-upkeep.mjs` is still a stub. Likely shape: run `fill-shopping-prep` idempotently against the current week (safety net if Friday's generate-week ran incomplete), reset `shopping_items.have` on repeating pantry staples, snapshot last week's actual-eating log, trim stale prior-week rows if we want.
+2. **Favorites system** — heart button in RecipeModal toggles `recipes.is_favorite`; "Why it works" text input updates `recipes.favorite_reason`. Columns already exist, and the Recipes grid already decorates favorited cards with a heart + has a Favorites tab that appears when any favorite exists. The button is now gated on `canEdit` so visitors see a read-only heart indicator.
+3. **Recipe modal edit flow** — "Edit my version" button → form with name/ingredients/method/adaptation; saves updates back to `recipes` row. Owner never uploads photos; keep current image or regenerate on next image-gen pass.
+4. **"+ Add my own recipe"** — new modal (reuses the Edit form in create mode) that inserts a `recipes` row. New rows don't have `image_url` yet — the next `node run.mjs generate-images` run picks them up because the job skips rows that already have one.
+5. Day view polish — proper modal confirm instead of `window.confirm` for Apply menu; migrate MY PLATE off `custom_notes` seam; derive slot title ("Sprouts + soy eggs") now that plate components are flagged.
 
 ## Known gotchas (don't re-discover)
 - Netlify: Team Access Controls / Visitor access can block public reads. Must be "Public" at both team and site level.
@@ -91,6 +93,7 @@
 - Supabase: secret key must be fetched from dashboard (`sb_secret_...`); Management API returns it masked.
 - Node is nvm-managed. launchd plists use `scripts/run-job.sh` which sources nvm, don't hard-code node path.
 - All deploys are direct uploads via Netlify CLI with NETLIFY_AUTH_TOKEN env var. GitHub-triggered auto-deploys are NOT wired up.
+- Anthropic SDK + Sonnet 5.5: for direct `messages.create` calls that need deterministic text output (not tool-use loops), pass `thinking: { type: 'between_tools' }`. Without it the model can spend its entire `max_tokens` budget on hidden thinking tokens and return zero text (seen with `stop_reason: 'max_tokens'` + `output_tokens_details.thinking_tokens == max_tokens`). The error-path hint from the API is: "To turn thinking off on this model, send 'thinking': {'type': 'between_tools'} instead of {'type': 'disabled'}." The `jobs/claude.mjs` `ask()` helper does NOT set this yet — jobs that must emit a long JSON (e.g. `fill-shopping-prep.mjs`) call the SDK directly.
 
 ## Open decisions
 - Owner-provided vs. AI-generated dish photos.

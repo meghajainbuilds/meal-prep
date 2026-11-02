@@ -11,8 +11,7 @@ import {
 } from '../lib/data'
 
 export default function Prep() {
-  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
-  const canEdit = !!session
+  const { session, activeWeek, allWeeks, canEdit } = useOutletContext<AppContext>()
   const [, setSearchParams] = useSearchParams()
   const [pickerError, setPickerError] = useState<string | null>(null)
 
@@ -138,13 +137,6 @@ export default function Prep() {
           {error && (
             <div className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm text-accent">
               {error} <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
-            </div>
-          )}
-
-          {!session && (
-            <div className="rounded-xl border border-dashed border-border bg-surface/50 p-4 text-sm text-muted">
-              Signed-out view. Sign in to check items off, edit, or add.
-              <div className="mt-3"><SignIn /></div>
             </div>
           )}
 

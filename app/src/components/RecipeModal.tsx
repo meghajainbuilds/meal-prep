@@ -4,9 +4,10 @@ import { getRecipeById, type RecipeFull } from '../lib/data'
 type Props = {
   recipeId: string | null
   onClose: () => void
+  canEdit?: boolean
 }
 
-export default function RecipeModal({ recipeId, onClose }: Props) {
+export default function RecipeModal({ recipeId, onClose, canEdit = false }: Props) {
   const [recipe, setRecipe] = useState<RecipeFull | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -88,19 +89,30 @@ export default function RecipeModal({ recipeId, onClose }: Props) {
                     <p className="mt-2 text-ink-soft">{recipe.description}</p>
                   )}
 
-                  <div className="mt-4 flex items-center gap-3">
-                    <button
-                      aria-label={recipe.is_favorite ? 'Unfavorite' : 'Favorite'}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card hover:border-ink"
-                    >
-                      <span className={recipe.is_favorite ? 'text-accent' : 'text-ink/40'}>
-                        {recipe.is_favorite ? '♥' : '♡'}
-                      </span>
-                    </button>
-                    {recipe.favorite_reason && (
-                      <p className="text-sm text-ink-soft italic">{recipe.favorite_reason}</p>
-                    )}
-                  </div>
+                  {(canEdit || recipe.is_favorite) && (
+                    <div className="mt-4 flex items-center gap-3">
+                      {canEdit ? (
+                        <button
+                          aria-label={recipe.is_favorite ? 'Unfavorite' : 'Favorite'}
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card hover:border-ink"
+                        >
+                          <span className={recipe.is_favorite ? 'text-accent' : 'text-ink/40'}>
+                            {recipe.is_favorite ? '♥' : '♡'}
+                          </span>
+                        </button>
+                      ) : (
+                        <span
+                          aria-label="Favorite"
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-accent"
+                        >
+                          ♥
+                        </span>
+                      )}
+                      {recipe.favorite_reason && (
+                        <p className="text-sm text-ink-soft italic">{recipe.favorite_reason}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </header>

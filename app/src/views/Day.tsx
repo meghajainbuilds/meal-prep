@@ -19,8 +19,7 @@ import {
 const SLOTS: MealPlanItem['slot'][] = ['breakfast', 'midmorning', 'lunch', 'dinner', 'evening']
 
 export default function Day() {
-  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
-  const canEdit = !!session
+  const { session, activeWeek, allWeeks, canEdit } = useOutletContext<AppContext>()
 
   const [items, setItems] = useState<MealPlanItem[]>([])
   const [ateLogs, setAteLogs] = useState<ActualEatingLog[]>([])
@@ -237,13 +236,6 @@ export default function Day() {
         </div>
       )}
 
-      {!session && (
-        <div className="rounded-xl border border-dashed border-border bg-surface/50 p-4 text-sm text-muted">
-          Signed-out view. Sign in to log what you actually ate or edit the plan.
-          <div className="mt-3"><SignIn /></div>
-        </div>
-      )}
-
       {error && (
         <div className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm text-accent">
           {error} <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
@@ -305,7 +297,7 @@ export default function Day() {
         onClose={() => setMenuOpen(false)}
         onApply={handleApplyMenu}
       />
-      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} />
+      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} canEdit={canEdit} />
     </div>
   )
 }

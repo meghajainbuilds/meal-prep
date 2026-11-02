@@ -14,6 +14,7 @@ export type AppContext = {
   session: Session | null
   activeWeek: WeekT | null
   allWeeks: WeekWithCount[]
+  canEdit: boolean
 }
 
 export default function App() {
@@ -44,7 +45,9 @@ export default function App() {
     ? `Week of ${monthShort(activeWeek.week_start)} ${dayNumber(activeWeek.week_start)}`
     : undefined
 
-  const isVisitor = !!session?.user?.email && session.user.email !== OWNER_EMAIL
+  const isOwner = session?.user?.email === OWNER_EMAIL
+  const isVisitor = !!session?.user?.email && !isOwner
+  const canEdit = isOwner
 
   return (
     <div className="min-h-screen bg-bg">
@@ -75,7 +78,7 @@ export default function App() {
         {loading ? (
           <p className="text-muted">Loading…</p>
         ) : (
-          <Outlet context={{ session, activeWeek, allWeeks } satisfies AppContext} />
+          <Outlet context={{ session, activeWeek, allWeeks, canEdit } satisfies AppContext} />
         )}
       </main>
       <footer className="border-t border-border bg-bg py-8">

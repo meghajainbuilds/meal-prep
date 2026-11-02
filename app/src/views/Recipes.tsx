@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import type { AppContext } from '../App'
 import RecipeModal from '../components/RecipeModal'
 import { getAllRecipes, type Recipe } from '../lib/data'
 
@@ -10,6 +12,7 @@ function titleCase(s: string): string {
 }
 
 export default function Recipes() {
+  const { canEdit } = useOutletContext<AppContext>()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
   const [openRecipe, setOpenRecipe] = useState<string | null>(null)
@@ -145,7 +148,7 @@ export default function Recipes() {
         </div>
       )}
 
-      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} />
+      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} canEdit={canEdit} />
     </div>
   )
 }

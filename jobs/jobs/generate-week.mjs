@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import { db } from '../db.mjs'
 import { ask } from '../claude.mjs'
+import fillShoppingPrep from './fill-shopping-prep.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const REQ_PATH = resolve(here, '..', '..', '.claude', 'requirements.md')
@@ -146,10 +147,18 @@ export default async function generateWeek() {
   const { error: itemsErr } = await db.from('meal_plan_items').insert(inserts)
   if (itemsErr) throw itemsErr
 
+  let shoppingPrepSummary = null
+  try {
+    shoppingPrepSummary = await fillShoppingPrep({ weekId: weekRow.id })
+  } catch (e) {
+    console.error('fillShoppingPrep failed (menu still saved):', e?.message ?? e)
+  }
+
   return {
     created: weekRow,
     item_count: inserts.length,
     rationale: parsed.rationale ?? null,
+    shopping_prep: shoppingPrepSummary,
   }
 }
 

@@ -13,8 +13,7 @@ import {
 type Filter = 'all' | 'check'
 
 export default function Ingredients() {
-  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
-  const canEdit = !!session
+  const { session, activeWeek, allWeeks, canEdit } = useOutletContext<AppContext>()
   const [, setSearchParams] = useSearchParams()
 
   const [items, setItems] = useState<ShoppingItem[]>([])
@@ -187,13 +186,6 @@ export default function Ingredients() {
           onCancel={() => setAddOpen(false)}
           onAdd={handleAdd}
         />
-      )}
-
-      {!session && (
-        <div className="rounded-xl border border-dashed border-border bg-surface/50 p-4 text-sm text-muted">
-          Signed-out view. Sign in to edit quantities or mark Have.
-          <div className="mt-3"><SignIn /></div>
-        </div>
       )}
 
       {error && (

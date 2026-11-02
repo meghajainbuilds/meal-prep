@@ -19,7 +19,7 @@ const COLS: { slot: MealPlanItem['slot']; label: string }[] = [
 ]
 
 export default function Week() {
-  const { session, activeWeek, allWeeks } = useOutletContext<AppContext>()
+  const { session, activeWeek, allWeeks, canEdit } = useOutletContext<AppContext>()
   const navigate = useNavigate()
   const [, setSearchParams] = useSearchParams()
   const [items, setItems] = useState<MealPlanItem[]>([])
@@ -139,13 +139,7 @@ export default function Week() {
         </div>
       )}
 
-      {!session && (
-        <div className="pt-4">
-          <SignIn />
-        </div>
-      )}
-
-      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} />
+      <RecipeModal recipeId={openRecipe} onClose={() => setOpenRecipe(null)} canEdit={canEdit} />
     </div>
   )
 }
